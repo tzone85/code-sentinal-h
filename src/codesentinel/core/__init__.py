@@ -2,6 +2,7 @@
 
 from codesentinel.core.context_builder import ContextBuilder
 from codesentinel.core.diff_parser import LANGUAGE_MAP, DiffParser
+from codesentinel.core.engine import ReviewEngine
 from codesentinel.core.enums import FileStatus, FileType, Severity
 from codesentinel.core.exceptions import (
     CodeSentinelError,
@@ -37,6 +38,7 @@ __all__ = [
     "DiffParser",
     "DiffParseError",
     "DiffStats",
+    "ReviewEngine",
     "FileClassifier",
     "FileDiff",
     "FileStatus",
