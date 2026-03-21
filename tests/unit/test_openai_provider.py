@@ -210,3 +210,49 @@ class TestOpenAIProviderReview:
         result = await provider.review("sys", "usr")
 
         assert result.content == ""
+
+    async def test_review_handles_none_usage(self, provider: OpenAIProvider) -> None:
+        """When usage stats are None, token counts default to 0."""
+        fake = _FakeResponse(usage=None)  # type: ignore[arg-type]
+        provider._client.chat.completions.create = AsyncMock(return_value=fake)
+
+        result = await provider.review("sys", "usr")
+
+        assert result.input_tokens == 0
+        assert result.output_tokens == 0
+
+    async def test_review_uses_configured_model_and_params(
+        self, provider: OpenAIProvider
+    ) -> None:
+        """Verify model, max_tokens, temperature are passed to the API."""
+        fake = _make_fake_response("[]")
+        provider._client.chat.completions.create = AsyncMock(return_value=fake)
+
+        await provider.review("sys", "usr")
+
+        call_kwargs = provider._client.chat.completions.create.call_args.kwargs
+        assert call_kwargs["model"] == "gpt-4o"
+        assert call_kwargs["max_tokens"] == 4096
+        assert call_kwargs["temperature"] == 0.2
+
+    async def test_review_falls_back_to_configured_model(
+        self, provider: OpenAIProvider
+    ) -> None:
+        """When response.model is None, falls back to configured model."""
+        fake = _FakeResponse(model=None)  # type: ignore[arg-type]
+        provider._client.chat.completions.create = AsyncMock(return_value=fake)
+
+        result = await provider.review("sys", "usr")
+
+        assert result.model == "gpt-4o"
+
+    async def test_review_wraps_exception_with_llm_error(
+        self, provider: OpenAIProvider
+    ) -> None:
+        """Various exception types are wrapped as LLMError."""
+        provider._client.chat.completions.create = AsyncMock(
+            side_effect=TimeoutError("timed out"),
+        )
+
+        with pytest.raises(LLMError, match="OpenAI API"):
+            await provider.review("sys", "usr")
