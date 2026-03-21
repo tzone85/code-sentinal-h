@@ -1,0 +1,50 @@
+name: "CodeSentinel Review"
+description: "AI-powered code review that enforces architectural patterns on pull requests."
+author: "CodeSentinel"
+
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  anthropic_api_key:
+    description: "Anthropic API key for Claude-based reviews."
+    required: false
+  openai_api_key:
+    description: "OpenAI API key for GPT-based reviews."
+    required: false
+  github_token:
+    description: "GitHub token for posting review comments."
+    required: false
+    default: ${{ github.token }}
+  config_path:
+    description: "Path to the .codesentinel.yaml configuration file."
+    required: false
+    default: ".codesentinel.yaml"
+  patterns_repo:
+    description: "Remote Git repository URL containing custom patterns."
+    required: false
+  patterns_path:
+    description: "Path within the patterns repository to load patterns from."
+    required: false
+    default: "patterns"
+  min_severity:
+    description: "Minimum severity level to report (critical, high, medium, low, info)."
+    required: false
+    default: "medium"
+  fail_on:
+    description: "Severity threshold that causes the action to fail (critical, high, medium, low, info)."
+    required: false
+    default: "critical"
+
+outputs:
+  findings_count:
+    description: "Total number of findings detected."
+  critical_count:
+    description: "Number of critical-severity findings."
+  report_path:
+    description: "Path to the generated review report file."
+
+runs:
+  using: "docker"
+  image: "Dockerfile"
