@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: clean-architecture
+  category: architecture
+  language: java
+  severity: high
+  tags:
+    - clean-arch
+    - dependency-rule
+    - layers
+  confidence_threshold: 0.8
+spec:
+  description: >
+    Clean Architecture Dependency Rule — domain layer must not import from
+    infrastructure, adapter, or controller layers. Dependencies must point
+    inward (infrastructure → application → domain).
+  rationale: >
+    The Dependency Rule is the cornerstone of Clean Architecture. When domain
+    code depends on infrastructure details (databases, frameworks, HTTP), the
+    business logic becomes tightly coupled to implementation choices, making
+    it hard to test, evolve, or swap technologies. Keeping the domain pure
+    ensures long-term maintainability.
+  applies_to:
+    include:
+      - "**/*.java"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "import from infrastructure package in a domain-layer class"
+      - "import from adapter or controller package in a domain-layer class"
+      - "domain class directly instantiates an infrastructure implementation"
+      - "domain interface references framework-specific annotations"
+    negative_signals:
+      - "domain class importing from another domain package"
+      - "application/service layer importing from infrastructure (allowed)"
+      - "test code importing infrastructure for integration tests"
+    context_clues:
+      - "package declaration contains .domain."
+      - "class is in a domain model or domain service package"
+      - "file path includes /domain/"
+  examples:
+    correct:
+      - description: "Domain entity with no infrastructure imports"
+        code: |
+          package com.example.domain.model;
+
+          import com.example.domain.repository.UserRepository;
+          import com.example.domain.event.UserCreatedEvent;
+
+          public class User {
+              private final String id;
+              private final String email;
+
+              public User(String id, String email) {
+                  this.id = id;
+                  this.email = email;
+              }
+          }
+      - description: "Domain service depending only on domain interfaces"
+        code: |
+          package com.example.domain.service;
+
+          import com.example.domain.model.User;
+          import com.example.domain.repository.UserRepository;
+
+          public class UserService {
+              private final UserRepository userRepository;
+
+              public UserService(UserRepository userRepository) {
+                  this.userRepository = userRepository;
+              }
+          }
+    incorrect:
+      - description: "Domain entity importing infrastructure persistence"
+        code: |
+          package com.example.domain.model;
+
+          import com.example.infrastructure.persistence.JpaUserRepository;
+          import javax.persistence.Entity;
+          import javax.persistence.Id;
+
+          @Entity
+          public class User {
+              @Id
+              private String id;
+          }
+      - description: "Domain service importing a controller"
+        code: |
+          package com.example.domain.service;
+
+          import com.example.adapter.controller.UserController;
+
+          public class UserService {
+              // Violation: domain depends on adapter layer
+          }
+  remediation: >
+    Move the dependency behind a domain interface (port). Define the interface
+    in the domain layer and provide the concrete implementation in the
+    infrastructure layer. Use dependency injection to wire them together.
+  references:
+    - title: "The Clean Architecture — Robert C. Martin"
+      url: "https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html"
+    - title: "Hexagonal Architecture — Alistair Cockburn"
+      url: "https://alistair.cockburn.us/hexagonal-architecture/"

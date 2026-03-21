@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: naming-conventions
+  category: style
+  severity: low
+  tags:
+    - naming
+    - readability
+    - conventions
+  confidence_threshold: 0.65
+spec:
+  description: >
+    Naming Conventions — files, classes, functions, and variables should
+    follow consistent naming conventions appropriate to the language
+    (PascalCase for classes, snake_case for Python functions, camelCase
+    for JavaScript/TypeScript functions, etc.).
+  rationale: >
+    Consistent naming reduces cognitive load when reading code. When names
+    follow predictable conventions, developers can infer the type and scope
+    of an identifier at a glance. Mixed conventions within a codebase
+    signal carelessness and make onboarding harder.
+  applies_to:
+    include:
+      - "**/*.py"
+      - "**/*.java"
+      - "**/*.ts"
+      - "**/*.js"
+      - "**/*.go"
+      - "**/*.rb"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+      - "**/migrations/**"
+      - "**/generated/**"
+  detection:
+    positive_signals:
+      - "Python function using camelCase instead of snake_case"
+      - "Java or TypeScript class using snake_case instead of PascalCase"
+      - "constant not in UPPER_SNAKE_CASE"
+      - "file name inconsistent with language conventions"
+      - "mixed naming styles within the same module"
+    negative_signals:
+      - "name follows the language's standard convention"
+      - "name matches an external API or library convention"
+      - "name is a well-known abbreviation or acronym"
+      - "name is in generated or third-party code"
+    context_clues:
+      - "function, method, or variable declaration"
+      - "class or interface definition"
+      - "file or module name"
+  examples:
+    correct:
+      - description: "Python — snake_case functions, PascalCase classes"
+        code: |
+          class UserRepository:
+              def find_by_id(self, user_id: str) -> User:
+                  ...
+
+              def create_user(self, email: str) -> User:
+                  ...
+      - description: "TypeScript — camelCase functions, PascalCase classes"
+        code: |
+          class UserService {
+            findById(userId: string): Promise<User> {
+              ...
+            }
+
+            createUser(email: string): Promise<User> {
+              ...
+            }
+          }
+    incorrect:
+      - description: "Python function using camelCase"
+        code: |
+          class UserRepository:
+              def findById(self, userId: str) -> User:
+                  ...
+
+              def createUser(self, Email: str) -> User:
+                  ...
+      - description: "TypeScript class using snake_case"
+        code: |
+          class user_service {
+            find_by_id(user_id: string): Promise<User> {
+              ...
+            }
+          }
+  remediation: >
+    Rename identifiers to follow the language's standard conventions.
+    Python: snake_case for functions/variables, PascalCase for classes,
+    UPPER_SNAKE_CASE for constants. Java/TypeScript: camelCase for
+    methods/variables, PascalCase for classes. Use your IDE's rename
+    refactoring to update all references safely.
+  references:
+    - title: "PEP 8 — Naming Conventions"
+      url: "https://peps.python.org/pep-0008/#naming-conventions"
+    - title: "Google Java Style Guide — Naming"
+      url: "https://google.github.io/styleguide/javaguide.html#s5-naming"
