@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Literal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -73,8 +74,8 @@ def _make_reporter(
     scm: MagicMock | None = None,
     *,
     enabled: bool = True,
-    comment_style: str = "both",
-    request_changes_on: str = "critical",
+    comment_style: Literal["inline", "summary", "both"] = "both",
+    request_changes_on: Literal["critical", "high", "medium", "low", "info"] = "critical",
 ) -> GitHubPRReporter:
     config = GitHubReporterConfig(
         enabled=enabled,

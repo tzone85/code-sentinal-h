@@ -23,15 +23,6 @@ _SEVERITY_BADGES: dict[Severity, str] = {
     Severity.INFO: "\u2139\ufe0f **INFO**",
 }
 
-_SEVERITY_THRESHOLD: dict[str, Severity] = {
-    "critical": Severity.CRITICAL,
-    "high": Severity.HIGH,
-    "medium": Severity.MEDIUM,
-    "low": Severity.LOW,
-    "info": Severity.INFO,
-}
-
-
 class GitHubPRReporter(Reporter):
     """Posts review findings as GitHub PR comments via the GitHub API."""
 
@@ -144,28 +135,30 @@ def _format_summary(result: ReviewResult) -> str:
             "No findings detected. The code looks good!"
         )
 
-    header = f"## CodeSentinel Review\n\n**{len(findings)} finding(s) detected.**\n"
-
-    table_header = (
-        "| File | Line | Severity | Pattern | Title |\n"
-        "|------|------|----------|---------|-------|\n"
-    )
-
-    rows: list[str] = []
+    parts = [
+        "## CodeSentinel Review",
+        "",
+        f"**{len(findings)} finding(s) detected.**",
+        "",
+        "| File | Line | Severity | Pattern | Title |",
+        "|------|------|----------|---------|-------|",
+    ]
     for f in findings:
         badge = _SEVERITY_BADGES.get(f.severity, f.severity.value.upper())
-        rows.append(
+        parts.append(
             f"| `{f.file}` | {f.line} | {badge} | `{f.pattern_name}` | {f.title} |"
         )
 
-    return header + "\n" + table_header + "\n".join(rows)
+    return "\n".join(parts)
 
 
 def _should_request_changes(
     findings: tuple[Finding, ...],
     threshold_str: str,
 ) -> bool:
-    threshold = _SEVERITY_THRESHOLD.get(threshold_str)
-    if threshold is None:
+    try:
+        threshold = Severity(threshold_str)
+    except ValueError:
+        logger.warning("Unknown request_changes_on value %r — skipping", threshold_str)
         return False
     return any(f.severity >= threshold for f in findings)
