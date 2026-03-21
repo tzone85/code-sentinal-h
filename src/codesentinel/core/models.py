@@ -10,7 +10,6 @@ from datetime import datetime
 
 from codesentinel.core.enums import FileStatus, FileType, Severity
 
-
 # --------------------------------------------------------------------------- #
 # Diff models
 # --------------------------------------------------------------------------- #

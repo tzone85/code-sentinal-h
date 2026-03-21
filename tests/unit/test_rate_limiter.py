@@ -168,9 +168,8 @@ class TestRateLimiterContextManager:
             "_wait_for_rpm_budget",
             new_callable=AsyncMock,
             side_effect=RuntimeError("boom"),
-        ):
-            with pytest.raises(RuntimeError, match="boom"):
-                await limiter.acquire()
+        ), pytest.raises(RuntimeError, match="boom"):
+            await limiter.acquire()
         # Semaphore should be released despite the error
         assert limiter._semaphore._value == 1
 

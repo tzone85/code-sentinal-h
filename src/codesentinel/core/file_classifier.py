@@ -134,10 +134,7 @@ _FRAMEWORK_PATH_HINTS: dict[str, list[str]] = {
 
 def _matches_any(path: str, patterns: list[str]) -> bool:
     """Check if a path matches any of the given glob patterns."""
-    for pattern in patterns:
-        if fnmatch.fnmatch(path, pattern):
-            return True
-    return False
+    return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
 
 def _detect_language(path: str) -> str | None:

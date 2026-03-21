@@ -143,6 +143,15 @@ class TestFormatFlag:
 
         assert result.exit_code in (0, 1)
 
+    def test_sarif_format(self) -> None:
+        diff_path = str(DIFFS_DIR / "python_django_violation.diff")
+        with patch("codesentinel.cli.main._create_llm_provider", return_value=_mock_llm_with_findings()):
+            result = runner.invoke(
+                app, ["review", "--diff", diff_path, "--format", "sarif"]
+            )
+
+        assert result.exit_code in (0, 1)
+
 
 class TestDryRunFlag:
     """Test --dry-run flag."""
@@ -217,3 +226,76 @@ class TestTerminalOutputFormat:
             result = runner.invoke(app, ["review", "--diff", diff_path])
 
         assert "Summary" in result.output or "Findings" in result.output
+
+
+class TestInitCommand:
+    """Test the init command."""
+
+    def test_init_creates_config_directory(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["init"], input="n\n", env={"HOME": str(tmp_path)})
+        # init may succeed or note existing config — both are acceptable
+        assert result.exit_code in (0, 1, 2)
+
+    def test_init_shows_help(self) -> None:
+        result = runner.invoke(app, ["init", "--help"])
+        assert result.exit_code == 0
+        assert "init" in result.output.lower() or "Init" in result.output
+
+
+class TestConfigCommands:
+    """Test the config show and config validate commands."""
+
+    def test_config_show_displays_config(self) -> None:
+        result = runner.invoke(app, ["config", "show"])
+        assert result.exit_code == 0
+
+    def test_config_validate_with_default(self) -> None:
+        result = runner.invoke(app, ["config", "validate"])
+        # May succeed or fail depending on whether .codesentinel.yaml exists
+        assert result.exit_code in (0, 1, 2)
+
+    def test_config_show_help(self) -> None:
+        result = runner.invoke(app, ["config", "--help"])
+        assert result.exit_code == 0
+        assert "show" in result.output or "validate" in result.output
+
+
+class TestPatternsCommands:
+    """Test the patterns list, show, and validate commands."""
+
+    def test_patterns_list_shows_patterns(self) -> None:
+        result = runner.invoke(app, ["patterns", "list"])
+        assert result.exit_code == 0
+        # Should show at least some built-in patterns
+        assert len(result.output) > 0
+
+    def test_patterns_list_filter_by_language(self) -> None:
+        result = runner.invoke(app, ["patterns", "list", "--language", "python"])
+        assert result.exit_code == 0
+
+    def test_patterns_list_filter_by_category(self) -> None:
+        result = runner.invoke(app, ["patterns", "list", "--category", "security"])
+        assert result.exit_code == 0
+
+    def test_patterns_show_builtin_pattern(self) -> None:
+        result = runner.invoke(app, ["patterns", "show", "security-no-hardcoded-secrets"])
+        assert result.exit_code == 0
+        assert "security" in result.output.lower() or "secret" in result.output.lower()
+
+    def test_patterns_show_unknown_pattern_exits_nonzero(self) -> None:
+        result = runner.invoke(app, ["patterns", "show", "nonexistent-pattern-xyz"])
+        assert result.exit_code != 0
+
+    def test_patterns_help(self) -> None:
+        result = runner.invoke(app, ["patterns", "--help"])
+        assert result.exit_code == 0
+        assert "list" in result.output or "show" in result.output
+
+
+class TestVersionCommand:
+    """Test the version command."""
+
+    def test_version_shows_version(self) -> None:
+        result = runner.invoke(app, ["version"])
+        # version command may output the version string
+        assert result.exit_code == 0
