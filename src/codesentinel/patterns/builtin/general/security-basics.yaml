@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: security-basics
+  category: security
+  severity: high
+  tags:
+    - security
+    - input-validation
+    - output-encoding
+  confidence_threshold: 0.75
+spec:
+  description: >
+    Security Basics — validate all user input before processing, encode
+    output to prevent XSS, use parameterized queries to prevent SQL
+    injection, and never trust data from external sources.
+  rationale: >
+    Input validation and output encoding are the most fundamental security
+    controls. Missing validation leads to injection attacks (SQL, XSS,
+    command injection) which consistently rank in the OWASP Top 10.
+    These are preventable with disciplined input/output handling.
+  applies_to:
+    include:
+      - "**/*.py"
+      - "**/*.java"
+      - "**/*.ts"
+      - "**/*.js"
+      - "**/*.go"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "string concatenation used to build SQL queries"
+      - "user input rendered directly in HTML without encoding"
+      - "user input passed to shell command without sanitization"
+      - "request parameter used directly in file path (path traversal)"
+    negative_signals:
+      - "parameterized query or prepared statement used"
+      - "output encoded or escaped before rendering"
+      - "input validated against schema or allowlist"
+      - "ORM used for database access"
+    context_clues:
+      - "function handles user input from HTTP request"
+      - "database query construction"
+      - "HTML template rendering"
+  examples:
+    correct:
+      - description: "Parameterized SQL query"
+        code: |
+          cursor.execute(
+              "SELECT * FROM users WHERE email = %s AND status = %s",
+              (email, "active"),
+          )
+    incorrect:
+      - description: "SQL injection via string concatenation"
+        code: |
+          cursor.execute(
+              f"SELECT * FROM users WHERE email = '{email}' AND status = 'active'"
+          )
+      - description: "User input in shell command"
+        code: |
+          import subprocess
+          subprocess.run(f"convert {user_filename} output.pdf", shell=True)
+  remediation: >
+    Always use parameterized queries for database access. Validate input
+    against schemas or allowlists at system boundaries. Encode output
+    appropriate to context (HTML, URL, SQL). Never pass user input to
+    shell commands; use subprocess with a list of arguments instead of
+    shell=True.
+  references:
+    - title: "OWASP Top 10"
+      url: "https://owasp.org/www-project-top-ten/"
+    - title: "OWASP Input Validation Cheat Sheet"
+      url: "https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html"

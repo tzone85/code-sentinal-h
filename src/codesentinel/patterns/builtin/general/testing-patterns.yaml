@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: testing-patterns
+  category: testing
+  severity: medium
+  tags:
+    - testing
+    - test-isolation
+    - assertions
+  confidence_threshold: 0.7
+spec:
+  description: >
+    Testing Patterns — tests should be isolated (no shared mutable state),
+    use meaningful assertions (not just "no exception thrown"), follow
+    Arrange-Act-Assert structure, and avoid testing implementation details.
+  rationale: >
+    Poorly structured tests give false confidence. Tests with shared state
+    create flaky failures that erode trust in the test suite. Tests without
+    meaningful assertions pass even when the code is broken. Tests coupled
+    to implementation details break on every refactor, discouraging change.
+  applies_to:
+    include:
+      - "**/test/**"
+      - "**/tests/**"
+      - "**/*_test.*"
+      - "**/*.test.*"
+      - "**/*.spec.*"
+  detection:
+    positive_signals:
+      - "test modifies class-level or module-level shared state"
+      - "test has no assertions (only calls the function)"
+      - "assertion checks only that no exception was thrown"
+      - "test mocks the implementation being tested (not its dependencies)"
+      - "test depends on execution order of other tests"
+    negative_signals:
+      - "test uses fresh fixtures or setup/teardown for isolation"
+      - "test has specific value assertions"
+      - "test follows Arrange-Act-Assert or Given-When-Then"
+      - "mocks are used for external dependencies, not the unit under test"
+    context_clues:
+      - "test function or method"
+      - "test class with setUp/tearDown"
+      - "pytest fixtures or JUnit @BeforeEach"
+  examples:
+    correct:
+      - description: "Isolated test with meaningful assertions"
+        code: |
+          def test_calculate_order_total_applies_discount():
+              # Arrange
+              items = [OrderItem(price=100, quantity=2)]
+              discount = Discount(percent=10)
+
+              # Act
+              total = calculate_total(items, discount)
+
+              # Assert
+              assert total == 180.0
+    incorrect:
+      - description: "Test with no meaningful assertion"
+        code: |
+          def test_process_order():
+              order = create_order(items=[{"id": 1}])
+              process_order(order)
+              # No assertion — test passes even if process_order is broken
+      - description: "Test with shared mutable state"
+        code: |
+          _orders = []  # Shared state between tests
+
+          def test_add_order():
+              _orders.append(Order(id=1))
+              assert len(_orders) == 1
+
+          def test_another():
+              # Fails if test_add_order ran first
+              assert len(_orders) == 0
+  remediation: >
+    Ensure every test has at least one meaningful assertion that verifies
+    the expected outcome. Use fresh fixtures for each test to prevent
+    shared state. Follow Arrange-Act-Assert pattern. Mock external
+    dependencies, not the unit under test.
+  references:
+    - title: "xUnit Test Patterns — Gerard Meszaros"
+      url: "http://xunitpatterns.com/"
+    - title: "Testing on the Toilet — Google"
+      url: "https://testing.googleblog.com/"

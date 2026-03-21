@@ -1,0 +1,80 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: nestjs-patterns
+  category: backend
+  language: typescript
+  severity: medium
+  tags:
+    - nestjs
+    - modules
+    - providers
+  confidence_threshold: 0.7
+spec:
+  description: >
+    NestJS Patterns — organise by feature modules, use providers for
+    injectable services, apply guards and pipes for cross-cutting concerns,
+    and avoid importing across module boundaries without explicit exports.
+  rationale: >
+    NestJS's module system enforces encapsulation. Reaching across module
+    boundaries without proper exports creates hidden coupling. Putting
+    business logic in controllers instead of injectable services prevents
+    reuse and makes testing harder.
+  applies_to:
+    include:
+      - "**/*.ts"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+      - "**/*.spec.ts"
+  detection:
+    positive_signals:
+      - "controller contains business logic instead of delegating to a service"
+      - "service imported from another module without that module exporting it"
+      - "validation logic in controller instead of using pipes"
+      - "authentication check in controller instead of using guards"
+    negative_signals:
+      - "controller injects and delegates to a service"
+      - "module explicitly exports providers used by other modules"
+      - "validation handled by ValidationPipe or custom pipe"
+    context_clues:
+      - "@Controller or @Injectable decorators"
+      - "@Module decorator with providers/exports"
+      - "NestJS application structure"
+  examples:
+    correct:
+      - description: "Controller delegates to injected service"
+        code: |
+          @Controller('users')
+          export class UserController {
+            constructor(private readonly userService: UserService) {}
+
+            @Post()
+            @UsePipes(new ValidationPipe())
+            async create(@Body() dto: CreateUserDto): Promise<UserResponse> {
+              return this.userService.create(dto);
+            }
+          }
+    incorrect:
+      - description: "Business logic in controller"
+        code: |
+          @Controller('users')
+          export class UserController {
+            constructor(
+              @InjectRepository(User) private repo: Repository<User>,
+            ) {}
+
+            @Post()
+            async create(@Body() body: any): Promise<User> {
+              const user = this.repo.create(body);
+              return this.repo.save(user);
+            }
+          }
+  remediation: >
+    Extract business logic into @Injectable() service classes. Use modules
+    to group related controllers, services, and entities. Export only the
+    providers that other modules need. Use pipes for validation and guards
+    for authentication/authorization.
+  references:
+    - title: "NestJS Documentation — Modules"
+      url: "https://docs.nestjs.com/modules"

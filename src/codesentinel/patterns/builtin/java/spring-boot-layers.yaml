@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: spring-boot-layers
+  category: architecture
+  language: java
+  severity: high
+  tags:
+    - spring-boot
+    - layers
+    - architecture
+  confidence_threshold: 0.8
+spec:
+  description: >
+    Spring Boot Layered Architecture — enforce controller → service →
+    repository dependency flow. Controllers must not access repositories
+    directly; repositories must not call services.
+  rationale: >
+    Spring Boot applications that bypass the service layer create tight
+    coupling between the HTTP layer and data access, making business logic
+    untestable in isolation and scattering transaction boundaries across
+    controllers.
+  applies_to:
+    include:
+      - "**/*.java"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "controller class injects or calls a repository directly"
+      - "repository class injects or calls a service"
+      - "@Controller or @RestController class references @Repository beans"
+    negative_signals:
+      - "controller delegates to a service"
+      - "service calls repository"
+      - "test class wires repository for integration testing"
+    context_clues:
+      - "@RestController or @Controller annotation"
+      - "@Service annotation"
+      - "@Repository annotation"
+  examples:
+    correct:
+      - description: "Controller delegates to service"
+        code: |
+          @RestController
+          @RequestMapping("/api/users")
+          public class UserController {
+              private final UserService userService;
+
+              public UserController(UserService userService) {
+                  this.userService = userService;
+              }
+
+              @GetMapping("/{id}")
+              public ResponseEntity<User> getUser(@PathVariable Long id) {
+                  return ResponseEntity.ok(userService.findById(id));
+              }
+          }
+    incorrect:
+      - description: "Controller accesses repository directly"
+        code: |
+          @RestController
+          @RequestMapping("/api/users")
+          public class UserController {
+              private final UserRepository userRepository;
+
+              public UserController(UserRepository userRepository) {
+                  this.userRepository = userRepository;
+              }
+
+              @GetMapping("/{id}")
+              public ResponseEntity<User> getUser(@PathVariable Long id) {
+                  return ResponseEntity.ok(userRepository.findById(id).orElseThrow());
+              }
+          }
+  remediation: >
+    Introduce a service class between the controller and repository. Move
+    business logic and transaction management into the service layer.
+    Controllers should only handle HTTP concerns (request mapping, response
+    formatting, validation).
+  references:
+    - title: "Spring Boot Reference — Structuring Your Code"
+      url: "https://docs.spring.io/spring-boot/reference/using/structuring-your-code.html"

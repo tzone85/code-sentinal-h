@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: fastapi-patterns
+  category: web
+  language: python
+  severity: medium
+  tags:
+    - fastapi
+    - dependency-injection
+    - response-models
+  confidence_threshold: 0.7
+spec:
+  description: >
+    FastAPI Patterns — use dependency injection for shared resources, define
+    explicit response models, and leverage Pydantic for request validation.
+    Avoid accessing raw request bodies when typed models are available.
+  rationale: >
+    FastAPI's dependency injection system and Pydantic integration provide
+    automatic validation, documentation, and type safety. Bypassing these
+    features (e.g., manual JSON parsing, missing response models) loses
+    the framework's benefits and makes endpoints harder to maintain and
+    document via OpenAPI.
+  applies_to:
+    include:
+      - "**/*.py"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "endpoint accesses request.json() or request.body() instead of typed parameters"
+      - "endpoint has no response_model defined"
+      - "database session created manually instead of using Depends()"
+      - "shared resource instantiated inside endpoint instead of via dependency"
+    negative_signals:
+      - "endpoint uses typed Pydantic model as parameter"
+      - "response_model is specified on the decorator"
+      - "Depends() used for database sessions and shared services"
+    context_clues:
+      - "@app.get, @app.post, @router.get decorators"
+      - "from fastapi import Depends"
+      - "async def endpoint function"
+  examples:
+    correct:
+      - description: "Proper use of dependency injection and response model"
+        code: |
+          @router.post("/users", response_model=UserResponse, status_code=201)
+          async def create_user(
+              user_in: UserCreate,
+              db: AsyncSession = Depends(get_db),
+              user_service: UserService = Depends(get_user_service),
+          ) -> UserResponse:
+              return await user_service.create(db, user_in)
+    incorrect:
+      - description: "Manual JSON parsing, no response model, no DI"
+        code: |
+          @app.post("/users")
+          async def create_user(request: Request):
+              body = await request.json()
+              db = SessionLocal()
+              user = User(**body)
+              db.add(user)
+              db.commit()
+              return {"id": user.id, "email": user.email}
+  remediation: >
+    Define Pydantic models for request and response bodies. Use
+    response_model on the route decorator. Inject shared resources
+    (database sessions, services) via Depends(). Let FastAPI handle
+    validation and serialization.
+  references:
+    - title: "FastAPI Documentation — Dependencies"
+      url: "https://fastapi.tiangolo.com/tutorial/dependencies/"
