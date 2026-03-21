@@ -1,0 +1,46 @@
+# Example workflow: CodeSentinel automated PR review
+#
+# Copy this file into your repository at .github/workflows/codesentinel.yml
+# to enable AI-powered code reviews on every pull request.
+#
+# Required secrets:
+#   ANTHROPIC_API_KEY  — for Claude-based reviews (recommended)
+#   OPENAI_API_KEY     — for OpenAI-based reviews (alternative)
+
+name: CodeSentinel Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: AI Code Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run CodeSentinel
+        id: codesentinel
+        uses: tzone85/code-sentinal-h/action@main
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          config_path: ".codesentinel.yaml"
+          min_severity: "medium"
+          fail_on: "critical"
+
+      - name: Review Summary
+        if: always()
+        env:
+          FINDINGS: ${{ steps.codesentinel.outputs.findings_count }}
+          CRITICAL: ${{ steps.codesentinel.outputs.critical_count }}
+        run: |
+          echo "Findings: $FINDINGS"
+          echo "Critical: $CRITICAL"
