@@ -184,7 +184,7 @@ class TestSarifRules:
     async def test_rule_has_required_fields(self, tmp_path: Path) -> None:
         output_path = str(tmp_path / "report.sarif")
         reporter = SarifReporter(output_path=output_path)
-        finding = _make_finding(pattern_name="clean-arch")
+        finding = _make_finding(pattern_name="clean-arch", title="Clean Architecture Violation")
         result = _make_result(findings=(finding,))
 
         await reporter.report(result)
@@ -192,9 +192,24 @@ class TestSarifRules:
         sarif = json.loads(Path(output_path).read_text())
         rule = sarif["runs"][0]["tool"]["driver"]["rules"][0]
         assert rule["id"] == "clean-arch"
-        assert "name" in rule
+        assert rule["name"] == "Clean Architecture Violation"
         assert "shortDescription" in rule
         assert rule["shortDescription"]["text"]
+
+    @pytest.mark.asyncio
+    async def test_rule_name_uses_finding_title(self, tmp_path: Path) -> None:
+        """rule.name should be human-readable (finding title), not the machine id."""
+        output_path = str(tmp_path / "report.sarif")
+        reporter = SarifReporter(output_path=output_path)
+        finding = _make_finding(pattern_name="sql-injection", title="SQL Injection Detected")
+        result = _make_result(findings=(finding,))
+
+        await reporter.report(result)
+
+        sarif = json.loads(Path(output_path).read_text())
+        rule = sarif["runs"][0]["tool"]["driver"]["rules"][0]
+        assert rule["id"] == "sql-injection"
+        assert rule["name"] == "SQL Injection Detected"
 
     @pytest.mark.asyncio
     async def test_empty_findings_produces_empty_rules(self, tmp_path: Path) -> None:
@@ -289,6 +304,7 @@ class TestSarifResults:
         location = sarif_result["locations"][0]
         physical = location["physicalLocation"]
         assert physical["artifactLocation"]["uri"] == "src/api/handler.py"
+        assert physical["artifactLocation"]["uriBaseId"] == "%SRCROOT%"
         assert physical["region"]["startLine"] == 99
 
     @pytest.mark.asyncio
@@ -384,6 +400,46 @@ class TestSarifEdgeCases:
         assert len(results) == 2
         lines = [r["locations"][0]["physicalLocation"]["region"]["startLine"] for r in results]
         assert lines == [10, 50]
+
+    @pytest.mark.asyncio
+    async def test_run_has_original_uri_base_ids(self, tmp_path: Path) -> None:
+        """SARIF run should include originalUriBaseIds for IDE path resolution."""
+        output_path = str(tmp_path / "report.sarif")
+        reporter = SarifReporter(output_path=output_path)
+        result = _make_result()
+
+        await reporter.report(result)
+
+        sarif = json.loads(Path(output_path).read_text())
+        base_ids = sarif["runs"][0]["originalUriBaseIds"]
+        assert "%SRCROOT%" in base_ids
+
+    @pytest.mark.asyncio
+    async def test_backslash_path_normalized_to_forward_slash(self, tmp_path: Path) -> None:
+        """Windows-style backslash paths must be normalized to forward slashes."""
+        output_path = str(tmp_path / "report.sarif")
+        reporter = SarifReporter(output_path=output_path)
+        finding = _make_finding(file="src\\api\\handler.py")
+        result = _make_result(findings=(finding,))
+
+        await reporter.report(result)
+
+        sarif = json.loads(Path(output_path).read_text())
+        uri = sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+        assert "\\" not in uri
+        assert uri == "src/api/handler.py"
+
+    @pytest.mark.asyncio
+    async def test_unwritable_path_does_not_raise(self, tmp_path: Path) -> None:
+        """I/O errors should be logged, not raised — graceful degradation."""
+        # Point to a path that cannot be written (a directory)
+        bad_path = str(tmp_path / "a_directory")
+        Path(bad_path).mkdir()
+        reporter = SarifReporter(output_path=bad_path)
+        result = _make_result()
+
+        # Should not raise — error is logged internally
+        await reporter.report(result)
 
     @pytest.mark.asyncio
     async def test_result_includes_description_in_message(self, tmp_path: Path) -> None:

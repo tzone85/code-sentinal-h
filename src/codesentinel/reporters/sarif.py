@@ -30,10 +30,20 @@ _SEVERITY_TO_LEVEL: dict[Severity, str] = {
     Severity.INFO: "note",
 }
 
+_DEFAULT_SARIF_LEVEL = "warning"
+
 
 def _severity_to_sarif_level(severity: Severity) -> str:
-    """Map a CodeSentinel severity to the SARIF ``level`` value."""
-    return _SEVERITY_TO_LEVEL[severity]
+    """Map a CodeSentinel severity to the SARIF ``level`` value.
+
+    Falls back to ``"warning"`` for any unmapped severity to avoid
+    crashing on future enum additions.
+    """
+    level = _SEVERITY_TO_LEVEL.get(severity)
+    if level is None:
+        logger.warning("Unmapped severity %r; defaulting to %r", severity, _DEFAULT_SARIF_LEVEL)
+        return _DEFAULT_SARIF_LEVEL
+    return level
 
 
 class SarifReporter(Reporter):
@@ -70,13 +80,20 @@ class SarifReporter(Reporter):
                         },
                     },
                     "results": results,
+                    "originalUriBaseIds": {
+                        "%SRCROOT%": {"uri": "file:///"},
+                    },
                 },
             ],
         }
 
         output = Path(self._output_path)
-        output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(sarif, indent=2))
+        try:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(sarif, indent=2), encoding="utf-8")
+        except OSError:
+            logger.error("Failed to write SARIF report to %s", self._output_path, exc_info=True)
+            return
         logger.info("SARIF report written to %s", self._output_path)
 
 
@@ -88,7 +105,12 @@ class SarifReporter(Reporter):
 def _build_rules(
     findings: tuple[Finding, ...],
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Build deduplicated SARIF rules and a name→index mapping."""
+    """Build deduplicated SARIF rules and a name→index mapping.
+
+    When multiple findings share a ``pattern_name``, the first occurrence's
+    metadata (title, description, severity) wins — consistent with how
+    the pattern registry treats the pattern as a single logical rule.
+    """
     rules: list[dict[str, Any]] = []
     rule_index: dict[str, int] = {}
 
@@ -99,7 +121,7 @@ def _build_rules(
         rules.append(
             {
                 "id": finding.pattern_name,
-                "name": finding.pattern_name,
+                "name": finding.title,
                 "shortDescription": {"text": finding.title},
                 "fullDescription": {"text": finding.description},
                 "defaultConfiguration": {
@@ -128,6 +150,8 @@ def _finding_to_result(
     if finding.code_snippet:
         region["snippet"] = {"text": finding.code_snippet}
 
+    # Normalize path separators to forward slashes for valid URI (SARIF §3.29.5)
+    uri = finding.file.replace("\\", "/")
     message_text = f"{finding.title}: {finding.description}"
 
     return {
@@ -138,7 +162,10 @@ def _finding_to_result(
         "locations": [
             {
                 "physicalLocation": {
-                    "artifactLocation": {"uri": finding.file},
+                    "artifactLocation": {
+                        "uri": uri,
+                        "uriBaseId": "%SRCROOT%",
+                    },
                     "region": region,
                 },
             },
