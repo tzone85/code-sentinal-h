@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: clean-architecture
+  category: architecture
+  language: java
+  severity: high
+  tags:
+    - clean-arch
+    - layers
+  confidence_threshold: 0.8
+spec:
+  description: "Domain layer must not import from infrastructure or adapter layers"
+  rationale: "Clean Architecture depends on the Dependency Rule: source code dependencies must point inward"
+  applies_to:
+    include:
+      - "**/*.java"
+    exclude:
+      - "**/test/**"
+  detection:
+    positive_signals:
+      - "import from infrastructure package in domain layer"
+      - "import from adapter package in domain layer"
+    negative_signals:
+      - "domain layer importing from domain layer"
+    context_clues:
+      - "package declaration contains .domain."
+  examples:
+    correct:
+      - description: "Domain entity with no infrastructure imports"
+        code: |
+          package com.example.domain.model;
+          import com.example.domain.repository.UserRepository;
+    incorrect:
+      - description: "Domain entity importing infrastructure"
+        code: |
+          package com.example.domain.model;
+          import com.example.infrastructure.persistence.JpaUserRepository;
+  remediation: "Move the dependency behind a domain interface (port) and inject the implementation"
+  references:
+    - title: "Clean Architecture by Robert C. Martin"
+      url: "https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html"

@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: api-error-responses
+  category: api-design
+  severity: medium
+  tags:
+    - api
+    - error-handling
+    - rest
+  confidence_threshold: 0.7
+spec:
+  description: >
+    Consistent API Error Responses — all API endpoints must return errors
+    using a standard error envelope instead of throwing raw exceptions or
+    returning inconsistent error shapes.
+  rationale: >
+    Inconsistent error responses force API consumers to write fragile
+    error-handling code with special cases per endpoint. A standard error
+    envelope (with code, message, and optional details) makes the API
+    predictable, simplifies client-side error handling, and improves
+    debuggability.
+  applies_to:
+    include:
+      - "**/*.py"
+      - "**/*.java"
+      - "**/*.ts"
+      - "**/*.js"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "API endpoint returns a raw string error message without structure"
+      - "endpoint raises or throws a generic exception without an error envelope"
+      - "different endpoints return different error shapes"
+      - "HTTP error response body is a plain text string"
+    negative_signals:
+      - "error is wrapped in a structured response object with code and message"
+      - "framework-provided exception handler converts to a standard format"
+      - "internal helper function raises for flow control (not an API boundary)"
+    context_clues:
+      - "function is decorated as an API endpoint or route handler"
+      - "function returns an HTTP response"
+      - "class is a REST controller or API view"
+  examples:
+    correct:
+      - description: "Structured error response with standard envelope"
+        code: |
+          @app.get("/users/{user_id}")
+          async def get_user(user_id: str):
+              user = await user_repo.find_by_id(user_id)
+              if user is None:
+                  return JSONResponse(
+                      status_code=404,
+                      content={
+                          "error": {
+                              "code": "USER_NOT_FOUND",
+                              "message": f"User {user_id} not found",
+                          }
+                      },
+                  )
+              return {"data": user}
+    incorrect:
+      - description: "Raw exception thrown from API endpoint"
+        code: |
+          @app.get("/users/{user_id}")
+          async def get_user(user_id: str):
+              user = await user_repo.find_by_id(user_id)
+              if user is None:
+                  raise Exception("User not found")
+              return user
+      - description: "Plain string error response"
+        code: |
+          @app.get("/users/{user_id}")
+          async def get_user(user_id: str):
+              user = await user_repo.find_by_id(user_id)
+              if user is None:
+                  return "Not found", 404
+              return user
+  remediation: >
+    Define a standard error response model with at minimum a code (machine-
+    readable string) and message (human-readable string). Use a global
+    exception handler to catch unhandled exceptions and convert them to
+    the standard format. Return appropriate HTTP status codes.
+  references:
+    - title: "RFC 9457 — Problem Details for HTTP APIs"
+      url: "https://www.rfc-editor.org/rfc/rfc9457"
+    - title: "Microsoft REST API Guidelines — Error Responses"
+      url: "https://github.com/microsoft/api-guidelines/blob/vNext/azure/Guidelines.md"
