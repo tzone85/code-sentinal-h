@@ -25,6 +25,7 @@ from codesentinel.llm.openai_provider import OpenAIProvider
 from codesentinel.patterns.loader import PatternLoader
 from codesentinel.patterns.registry import PatternRegistry
 from codesentinel.reporters.json_reporter import JsonReporter
+from codesentinel.reporters.sarif import SarifReporter
 from codesentinel.reporters.terminal import TerminalReporter
 from codesentinel.scm.base import SCMProvider
 
@@ -197,6 +198,8 @@ def _build_reporters(*, fmt: str, verbose: bool, config: CodeSentinelConfig) -> 
                 enabled=True,
             ),
         ]
+    if fmt == "sarif":
+        return [SarifReporter()]
     if fmt == "terminal":
         return [TerminalReporter(verbose=verbose)]
     # Unknown format falls back to terminal
