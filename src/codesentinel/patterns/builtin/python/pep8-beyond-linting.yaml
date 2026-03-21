@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: pep8-beyond-linting
+  category: style
+  language: python
+  severity: low
+  tags:
+    - pep8
+    - python-style
+    - module-structure
+  confidence_threshold: 0.65
+spec:
+  description: >
+    PEP 8 Beyond Linting — structural conventions that linters miss, such as
+    module-level organization (imports → constants → classes → functions →
+    main guard), import grouping (stdlib → third-party → local), and
+    avoiding wildcard imports.
+  rationale: >
+    Linters catch formatting issues but miss higher-level structural
+    problems. Consistent module layout makes files predictable and
+    scannable. Wildcard imports pollute the namespace and make it
+    impossible to determine where names come from.
+  applies_to:
+    include:
+      - "**/*.py"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+      - "**/migrations/**"
+      - "**/__init__.py"
+  detection:
+    positive_signals:
+      - "wildcard import (from module import *)"
+      - "module mixes constants, classes, and functions without clear sections"
+      - "import groups not separated by blank lines"
+      - "code at module level that should be behind if __name__ == '__main__'"
+    negative_signals:
+      - "imports grouped by stdlib, third-party, local with blank line separators"
+      - "module follows imports → constants → classes → functions order"
+      - "no wildcard imports"
+    context_clues:
+      - "Python module top-level structure"
+      - "import statements"
+      - "module-level code"
+  examples:
+    correct:
+      - description: "Well-structured module"
+        code: |
+          """User authentication service."""
+
+          from __future__ import annotations
+
+          import hashlib
+          import os
+
+          from argon2 import PasswordHasher
+
+          from app.models import User
+          from app.exceptions import AuthError
+
+          DEFAULT_ROUNDS = 12
+
+          class AuthService:
+              ...
+
+          def verify_token(token: str) -> bool:
+              ...
+    incorrect:
+      - description: "Disorganized module with wildcard import"
+        code: |
+          from app.models import *
+          import os
+          from argon2 import PasswordHasher
+          import hashlib
+
+          def verify_token(token):
+              ...
+
+          DEFAULT_ROUNDS = 12
+
+          class AuthService:
+              ...
+  remediation: >
+    Organize modules as: docstring → future imports → stdlib imports →
+    third-party imports → local imports → constants → classes → functions.
+    Replace wildcard imports with explicit names. Separate import groups
+    with a blank line. Use isort or ruff to automate import ordering.
+  references:
+    - title: "PEP 8 — Imports"
+      url: "https://peps.python.org/pep-0008/#imports"
