@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 
 import typer
 
@@ -11,15 +12,21 @@ import codesentinel
 from codesentinel.cli.config_commands import config_app
 from codesentinel.cli.init_command import init_project
 from codesentinel.cli.pattern_commands import patterns_app
+from codesentinel.config.loader import load_config
+from codesentinel.config.schema import CodeSentinelConfig
 from codesentinel.core.engine import ReviewEngine
 from codesentinel.core.enums import Severity
 from codesentinel.core.exceptions import CodeSentinelError, ConfigError
 from codesentinel.core.models import ReviewTarget
 from codesentinel.llm.base import LLMProvider
 from codesentinel.llm.claude import ClaudeProvider
+from codesentinel.llm.ollama import OllamaProvider
+from codesentinel.llm.openai_provider import OpenAIProvider
 from codesentinel.patterns.loader import PatternLoader
 from codesentinel.patterns.registry import PatternRegistry
+from codesentinel.reporters.json_reporter import JsonReporter
 from codesentinel.reporters.terminal import TerminalReporter
+from codesentinel.scm.base import SCMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +60,8 @@ def review(
     pr: str | None = typer.Option(None, "--pr", help="Pull request URL"),
     staged: bool = typer.Option(False, "--staged", help="Review staged changes"),
     repo: str = typer.Option(".", "--repo", help="Repository path"),
-    config_path: str = typer.Option(
-        ".codesentinel.yaml", "--config", help="Config file path"
-    ),
-    severity: str = typer.Option(
-        "medium", "--severity", help="Minimum severity to report"
-    ),
+    config_path: str = typer.Option(".codesentinel.yaml", "--config", help="Config file path"),
+    severity: str = typer.Option("medium", "--severity", help="Minimum severity to report"),
     fmt: str = typer.Option("terminal", "--format", help="Output format"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show config without running"),
@@ -70,16 +73,12 @@ def review(
         logging.basicConfig(level=logging.WARNING)
 
     # Build review target
-    target = _build_target(
-        diff=diff, branch=branch, base=base, pr=pr, staged=staged, repo=repo
-    )
+    target = _build_target(diff=diff, branch=branch, base=base, pr=pr, staged=staged, repo=repo)
     if target is None:
-        typer.echo(
-            "Error: Provide --diff, --branch, --pr, or --staged.", err=True
-        )
+        typer.echo("Error: Provide --diff, --branch, --pr, or --staged.", err=True)
         raise typer.Exit(code=2)
 
-    # Build config
+    # Build config (load from file + CLI overrides)
     config = _build_config(severity=severity, config_path=config_path)
 
     if dry_run:
@@ -87,26 +86,32 @@ def review(
         typer.echo(f"Config: {config}")
         raise typer.Exit(code=0)
 
+    # Load full config object for provider/reporter initialization
+    cs_config = _load_cs_config(config_path)
+
     # Load patterns
     loader = PatternLoader()
     patterns = loader.load_builtin()
     registry = PatternRegistry(patterns)
 
-    # Create LLM provider
+    # Create LLM provider based on config
     try:
-        llm_provider: LLMProvider = ClaudeProvider()
+        llm_provider = _create_llm_provider(cs_config)
     except ConfigError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    # Create SCM provider based on target type
+    scm_provider = _build_scm_provider(target_type=target.type, pr_url=target.pr_url, repo_path=repo)
+
     # Create reporters
-    reporters = _build_reporters(fmt=fmt, verbose=verbose)
+    reporters = _build_reporters(fmt=fmt, verbose=verbose, config=cs_config)
 
     # Create engine and run
     engine = ReviewEngine(
         config=config,
         llm_provider=llm_provider,
-        scm_provider=None,
+        scm_provider=scm_provider,
         pattern_registry=registry,
         reporters=reporters,
     )
@@ -156,29 +161,87 @@ def _build_target(
     if pr:
         return ReviewTarget(type="pr", pr_url=pr, repo_path=repo)
     if branch:
-        return ReviewTarget(
-            type="branch", branch=branch, base_branch=base, repo_path=repo
-        )
+        return ReviewTarget(type="branch", branch=branch, base_branch=base, repo_path=repo)
     if staged:
         return ReviewTarget(type="staged", repo_path=repo, base_branch=base)
     return None
 
 
+def _load_cs_config(config_path: str) -> CodeSentinelConfig:
+    """Load the full CodeSentinelConfig, falling back to defaults on error."""
+    try:
+        return load_config(config_path)
+    except ConfigError:
+        logger.warning("Failed to load config from %s — using defaults", config_path)
+        return CodeSentinelConfig()
+
+
 def _build_config(*, severity: str, config_path: str) -> dict[str, object]:
-    """Build a configuration dict from CLI options and config file."""
-    # TODO: load from .codesentinel.yaml via config loader (STORY-CS-013)
+    """Build a configuration dict from config file with CLI overrides."""
+    cs_config = _load_cs_config(config_path)
     return {
-        "mode": "coaching",
+        "mode": cs_config.review.mode,
         "min_severity": severity,
-        "min_confidence": 0.7,
-        "max_findings": 15,
+        "min_confidence": cs_config.review.min_confidence,
+        "max_findings": cs_config.review.max_findings,
         "fail_on": "critical",
     }
 
 
-def _build_reporters(*, fmt: str, verbose: bool) -> list[object]:
+def _build_reporters(*, fmt: str, verbose: bool, config: CodeSentinelConfig) -> list[object]:
     """Create the appropriate reporters based on output format."""
+    if fmt == "json":
+        return [
+            JsonReporter(
+                output_path=config.reporters.json_reporter.output_path,
+                enabled=True,
+            ),
+        ]
     if fmt == "terminal":
         return [TerminalReporter(verbose=verbose)]
-    # TODO: JSON and SARIF reporters (STORY-CS-021, STORY-CS-023)
+    # Unknown format falls back to terminal
     return [TerminalReporter(verbose=verbose)]
+
+
+def _build_scm_provider(*, target_type: str, pr_url: str | None, repo_path: str) -> SCMProvider | None:
+    """Select the appropriate SCM provider based on target type."""
+    if target_type in ("branch", "staged"):
+        from codesentinel.scm.local_git import LocalGitSCM
+
+        return LocalGitSCM()
+
+    if target_type == "pr" and pr_url:
+        token = os.environ.get("GITHUB_TOKEN", "")
+        if not token:
+            logger.warning("GITHUB_TOKEN not set — cannot create GitHubSCM provider")
+            return None
+        from codesentinel.scm.github import GitHubSCM
+
+        return GitHubSCM(token=token)
+
+    return None
+
+
+def _create_llm_provider(config: CodeSentinelConfig) -> LLMProvider:
+    """Create the appropriate LLM provider based on config."""
+    provider_name = config.llm.provider
+
+    if provider_name == "openai":
+        return OpenAIProvider(
+            model=config.llm.model if config.llm.model != "claude-sonnet-4-20250514" else "gpt-4o",
+            max_tokens=config.llm.max_tokens,
+            temperature=config.llm.temperature,
+        )
+
+    if provider_name == "ollama":
+        return OllamaProvider(
+            model=config.llm.model if config.llm.model != "claude-sonnet-4-20250514" else "llama3",
+            temperature=config.llm.temperature,
+        )
+
+    # Default: Claude
+    return ClaudeProvider(
+        model=config.llm.model,
+        max_tokens=config.llm.max_tokens,
+        temperature=config.llm.temperature,
+    )
