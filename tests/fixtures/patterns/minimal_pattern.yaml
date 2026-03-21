@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: minimal-example
+  category: general
+spec:
+  description: "A minimal valid pattern"

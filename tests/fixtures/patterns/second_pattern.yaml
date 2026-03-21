@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: api-error-handling
+  category: api-design
+  severity: medium
+  tags:
+    - api
+    - error-handling
+spec:
+  description: "API endpoints must return consistent error response envelopes"
+  rationale: "Consistent error responses improve client-side error handling"
+  applies_to:
+    include:
+      - "**/*.py"
+      - "**/*.ts"
+  detection:
+    positive_signals:
+      - "raw exception thrown from endpoint"
+  examples:
+    correct:
+      - description: "Structured error response"
+        code: |
+          return {"error": {"code": "NOT_FOUND", "message": "User not found"}}
+    incorrect:
+      - description: "Raw exception string"
+        code: |
+          raise Exception("User not found")
+  remediation: "Wrap errors in a standard error envelope with code and message fields"
