@@ -1,0 +1,40 @@
+version: "1.0"
+llm:
+  provider: claude
+  model: claude-sonnet-4-20250514
+  max_tokens: 4096
+  temperature: 0.2
+  max_concurrent_requests: 3
+patterns:
+  builtin:
+    enabled: true
+    include:
+      - security-basics
+      - error-handling
+    exclude:
+      - testing-patterns
+  local:
+    - .codesentinel/patterns
+  remote:
+    - repo: "org/shared-patterns"
+      path: "patterns"
+      ref: "main"
+      cache_ttl: 3600
+review:
+  min_severity: medium
+  max_findings: 15
+  min_confidence: 0.7
+  mode: coaching
+  focus:
+    - security
+    - architecture
+  ignore:
+    - "**/*.test.*"
+    - "**/node_modules/**"
+    - "**/vendor/**"
+reporters:
+  terminal:
+    enabled: true
+  json:
+    enabled: false
+    output_path: "codesentinel-report.json"

@@ -1,0 +1,7 @@
+llm:
+  provider: invalid_provider_name
+  max_tokens: -1
+  temperature: 99.9
+review:
+  min_severity: nonexistent_level
+  max_findings: not_a_number

@@ -629,3 +629,63 @@ index 0000000..1234567
         assert f.status == FileStatus.ADDED
         assert f.language == "yaml"
         assert f.added_line_count == 2
+
+
+# --------------------------------------------------------------------------- #
+# Deleted file with explicit "deleted file mode" header
+# --------------------------------------------------------------------------- #
+
+
+class TestDeletedFileMode:
+    """Cover line 383-384: deleted file detected via `deleted file mode` header."""
+
+    DIFF = """\
+diff --git a/src/removed.py b/src/removed.py
+deleted file mode 100644
+index abc1234..0000000
+--- a/src/removed.py
++++ /dev/null
+@@ -1,2 +0,0 @@
+-def old_func():
+-    pass
+"""
+
+    def test_status_deleted_via_mode(self, parser: DiffParser) -> None:
+        result = parser.parse(self.DIFF)
+        assert result.files[0].status == FileStatus.DELETED
+
+    def test_path_from_old(self, parser: DiffParser) -> None:
+        result = parser.parse(self.DIFF)
+        assert result.files[0].path == "src/removed.py"
+
+
+# --------------------------------------------------------------------------- #
+# parse_file with unreadable file (OSError)
+# --------------------------------------------------------------------------- #
+
+
+class TestParseFileOSError:
+    def test_directory_as_path_raises(self, parser: DiffParser, tmp_path: Path) -> None:
+        """Attempting to read a directory should raise DiffParseError."""
+        with pytest.raises(DiffParseError):
+            parser.parse_file(str(tmp_path))
+
+
+# --------------------------------------------------------------------------- #
+# Deleted file with only `deleted file mode` and no --- /dev/null
+# --------------------------------------------------------------------------- #
+
+
+class TestDeletedFileModeNoDevNull:
+    """Cover line 383-384: deleted file via is_deleted flag only."""
+
+    DIFF = """\
+diff --git a/src/stale.py b/src/stale.py
+deleted file mode 100644
+index abc1234..0000000
+"""
+
+    def test_deleted_via_flag_only(self, parser: DiffParser) -> None:
+        result = parser.parse(self.DIFF)
+        assert result.files[0].status == FileStatus.DELETED
+        assert result.files[0].path == "src/stale.py"

@@ -265,3 +265,44 @@ class TestStats:
         reg = PatternRegistry()
         stats = reg.stats()
         assert stats["total"] == 0
+
+
+# ------------------------------------------------------------------ #
+# _glob_match — simple fnmatch fallback (no **) → line 20
+# ------------------------------------------------------------------ #
+
+
+class TestGlobMatchFallback:
+    def test_simple_glob_without_doublestar(self) -> None:
+        """Glob like '*.py' (no **) should use fnmatch directly."""
+        pat = _pat("simple-glob", include=("*.py",))
+        reg = PatternRegistry([pat])
+        # Root-level python file matches *.py via fnmatch
+        result = reg.for_file("setup.py")
+        assert len(result) == 1
+
+    def test_simple_glob_no_match(self) -> None:
+        pat = _pat("simple-glob", include=("*.java",))
+        reg = PatternRegistry([pat])
+        result = reg.for_file("setup.py")
+        assert len(result) == 0
+
+
+# ------------------------------------------------------------------ #
+# for_file — language mismatch (both non-None) → line 96
+# ------------------------------------------------------------------ #
+
+
+class TestForFileLanguageMismatch:
+    def test_java_pattern_skips_python_file(self) -> None:
+        """Pattern with language=java should not match a python file."""
+        reg = PatternRegistry([JAVA_CLEAN])
+        result = reg.for_file("src/main/java/App.java", "python")
+        names = {p.metadata.name for p in result}
+        assert "clean-arch" not in names
+
+    def test_python_pattern_skips_typescript_file(self) -> None:
+        reg = PatternRegistry([PYTHON_DJANGO])
+        result = reg.for_file("app/views.py", "typescript")
+        names = {p.metadata.name for p in result}
+        assert "django-views" not in names
