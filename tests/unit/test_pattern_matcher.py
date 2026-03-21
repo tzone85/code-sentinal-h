@@ -160,25 +160,19 @@ class TestGlobExclude:
 
 
 class TestLanguageMatching:
-    def test_language_specific_pattern_matches_same_language(
-        self, matcher: PatternMatcher
-    ) -> None:
+    def test_language_specific_pattern_matches_same_language(self, matcher: PatternMatcher) -> None:
         files = [_make_file("src/main.py", language="python")]
         patterns = [_make_pattern("py-pattern", language="python")]
         result = matcher.match(files, patterns)
         assert "src/main.py" in result
 
-    def test_language_specific_pattern_skips_different_language(
-        self, matcher: PatternMatcher
-    ) -> None:
+    def test_language_specific_pattern_skips_different_language(self, matcher: PatternMatcher) -> None:
         files = [_make_file("src/main.py", language="python")]
         patterns = [_make_pattern("java-pattern", language="java")]
         result = matcher.match(files, patterns)
         assert "src/main.py" not in result
 
-    def test_language_agnostic_pattern_matches_any_language(
-        self, matcher: PatternMatcher
-    ) -> None:
+    def test_language_agnostic_pattern_matches_any_language(self, matcher: PatternMatcher) -> None:
         files = [
             _make_file("src/main.py", language="python"),
             _make_file("src/App.java", language="java"),
@@ -188,9 +182,7 @@ class TestLanguageMatching:
         assert "src/main.py" in result
         assert "src/App.java" in result
 
-    def test_file_with_no_language_matches_agnostic_only(
-        self, matcher: PatternMatcher
-    ) -> None:
+    def test_file_with_no_language_matches_agnostic_only(self, matcher: PatternMatcher) -> None:
         files = [_make_file("Makefile", language=None)]
         patterns = [
             _make_pattern("agnostic", language=None),
@@ -245,13 +237,9 @@ class TestMultiMatch:
 
 
 class TestCategoryMatching:
-    def test_architecture_pattern_matches_domain_layer(
-        self, matcher: PatternMatcher
-    ) -> None:
+    def test_architecture_pattern_matches_domain_layer(self, matcher: PatternMatcher) -> None:
         files = [_make_file("src/domain/User.java", language="java", layer="domain")]
-        patterns = [
-            _make_pattern("clean-arch", language="java", category="architecture", include=("**/*.java",))
-        ]
+        patterns = [_make_pattern("clean-arch", language="java", category="architecture", include=("**/*.java",))]
         result = matcher.match(files, patterns)
         assert "src/domain/User.java" in result
 
@@ -262,3 +250,30 @@ class TestCategoryMatching:
         patterns = [_make_pattern("general-rule", language="java", category="general")]
         result = matcher.match(files, patterns)
         assert "src/controller/Api.java" in result
+
+
+# --------------------------------------------------------------------------- #
+# Root file matching with **/ prefix (line 30)
+# --------------------------------------------------------------------------- #
+
+
+class TestRootFileMatching:
+    def test_root_file_matches_doublestar_glob(self, matcher: PatternMatcher) -> None:
+        """Root-level file should match **/*.py via stripped suffix fallback."""
+        files = [_make_file("setup.py", language="python")]
+        patterns = [_make_pattern("catch-py", language="python", include=("**/*.py",))]
+        result = matcher.match(files, patterns)
+        assert "setup.py" in result
+
+    def test_root_file_matches_wildcard(self, matcher: PatternMatcher) -> None:
+        files = [_make_file("Makefile", language=None)]
+        patterns = [_make_pattern("all", include=("**/*",))]
+        result = matcher.match(files, patterns)
+        assert "Makefile" in result
+
+    def test_root_file_no_match_specific_dir(self, matcher: PatternMatcher) -> None:
+        """Root file should not match a directory-specific glob."""
+        files = [_make_file("setup.py", language="python")]
+        patterns = [_make_pattern("src-only", include=("src/**/*.py",))]
+        result = matcher.match(files, patterns)
+        assert "setup.py" not in result

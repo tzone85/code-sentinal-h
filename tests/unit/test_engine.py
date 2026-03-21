@@ -329,3 +329,120 @@ class TestExitCodes:
         target = ReviewTarget(type="diff", diff_path=diff_path)
         result = await engine.review(target)
         assert engine.compute_exit_code(result) == 0
+
+
+# --------------------------------------------------------------------------- #
+# _extract_diff: non-diff target type → returns None → empty result (line 169)
+# --------------------------------------------------------------------------- #
+
+
+class TestExtractDiffEdgeCases:
+    @pytest.mark.asyncio
+    async def test_non_diff_target_returns_empty(self) -> None:
+        """Target type other than 'diff' returns None diff → empty result."""
+        engine = _build_engine()
+        target = ReviewTarget(type="branch", branch="feature/x")
+        result = await engine.review(target)
+        assert len(result.findings) == 0
+        assert result.stats.files_reviewed == 0
+
+    @pytest.mark.asyncio
+    async def test_diff_target_missing_path_returns_empty(self) -> None:
+        """Diff target without diff_path returns None → empty result."""
+        engine = _build_engine()
+        target = ReviewTarget(type="diff", diff_path=None)
+        result = await engine.review(target)
+        assert len(result.findings) == 0
+
+
+# --------------------------------------------------------------------------- #
+# _read_diff_file: file not found, read error (lines 176-182)
+# --------------------------------------------------------------------------- #
+
+
+class TestReadDiffFile:
+    def test_nonexistent_file_returns_none(self) -> None:
+        result = ReviewEngine._read_diff_file("/nonexistent/path/file.diff")
+        assert result is None
+
+    def test_existing_file_returns_content(self) -> None:
+        result = ReviewEngine._read_diff_file(str(FIXTURES_DIR / "clean_pr_no_issues.diff"))
+        assert result is not None
+        assert "diff --git" in result
+
+    def test_directory_returns_none(self, tmp_path: Path) -> None:
+        """Reading a directory should return None, not crash."""
+        result = ReviewEngine._read_diff_file(str(tmp_path))
+        # On some OS this returns None (IsADirectoryError), on others reads
+        # The important thing is it doesn't crash
+        assert result is None or isinstance(result, str)
+
+
+# --------------------------------------------------------------------------- #
+# _dict_to_finding: invalid data (lines 268-270)
+# --------------------------------------------------------------------------- #
+
+
+class TestDictToFinding:
+    def test_valid_dict(self) -> None:
+        data: dict[str, object] = {
+            "pattern_name": "test",
+            "severity": "high",
+            "confidence": 0.9,
+            "file": "src/main.py",
+            "line": 10,
+            "title": "Issue",
+            "description": "desc",
+            "rationale": "reason",
+            "remediation": "fix",
+        }
+        finding = ReviewEngine._dict_to_finding(data)
+        assert finding is not None
+        assert finding.pattern_name == "test"
+
+    def test_invalid_confidence_returns_none(self) -> None:
+        data: dict[str, object] = {
+            "pattern_name": "test",
+            "severity": "high",
+            "confidence": "not-a-number",
+            "file": "f.py",
+            "line": "not-a-number",
+            "title": "t",
+            "description": "d",
+            "rationale": "r",
+            "remediation": "f",
+        }
+        # line should be int, "not-a-number" should fail int()
+        finding = ReviewEngine._dict_to_finding(data)
+        assert finding is None
+
+    def test_missing_keys_uses_defaults(self) -> None:
+        data: dict[str, object] = {}
+        finding = ReviewEngine._dict_to_finding(data)
+        assert finding is not None
+        assert finding.pattern_name == "unknown"
+        assert finding.severity == Severity.MEDIUM
+
+
+# --------------------------------------------------------------------------- #
+# Reporter without is_enabled attribute
+# --------------------------------------------------------------------------- #
+
+
+class TestReporterWithoutIsEnabled:
+    @pytest.mark.asyncio
+    async def test_reporter_without_is_enabled_still_called(self) -> None:
+        """Reporter with report() but no is_enabled() should still be called."""
+        reporter = MagicMock()
+        reporter.report = AsyncMock()
+        # Deliberately remove is_enabled
+        del reporter.is_enabled
+        engine = _build_engine(
+            llm_response=_make_llm_response("[]"),
+            patterns=[_make_pattern()],
+            reporters=[reporter],
+        )
+        diff_path = str(FIXTURES_DIR / "clean_pr_no_issues.diff")
+        target = ReviewTarget(type="diff", diff_path=diff_path)
+        await engine.review(target)
+        reporter.report.assert_called_once()

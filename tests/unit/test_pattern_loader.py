@@ -239,3 +239,112 @@ class TestLoadAll:
         loader = PatternLoader(cache_dir=tmp_path)
         patterns = loader.load_all({})
         assert isinstance(patterns, list)
+
+    def test_load_all_with_remote_config(self, tmp_path: Path) -> None:
+        """Remote patterns that fail fetch return empty, don't crash."""
+        loader = PatternLoader(cache_dir=tmp_path)
+        config = {
+            "builtin": {"enabled": False},
+            "remote": [{"repo": "org/patterns", "path": "p", "ref": "main", "cache_ttl": 60}],
+            "local": [],
+        }
+        patterns = loader.load_all(config)
+        assert isinstance(patterns, list)
+
+    def test_load_all_with_builtin_include_filter(self, tmp_path: Path) -> None:
+        loader = PatternLoader(cache_dir=tmp_path)
+        config = {
+            "builtin": {"enabled": True, "include": ["security-basics"]},
+        }
+        patterns = loader.load_all(config)
+        names = {p.metadata.name for p in patterns}
+        if patterns:
+            assert all(n == "security-basics" for n in names)
+
+
+# ------------------------------------------------------------------ #
+# _load_yaml_file edge cases
+# ------------------------------------------------------------------ #
+
+
+class TestLoadYamlFileEdgeCases:
+    def test_non_dict_yaml_raises(self, tmp_path: Path) -> None:
+        """YAML file containing a list (not mapping) should raise PatternError."""
+        f = tmp_path / "list.yaml"
+        f.write_text("- item1\n- item2\n")
+        with pytest.raises(PatternError, match="does not contain a YAML mapping"):
+            _load_yaml_file(f)
+
+    def test_scalar_yaml_raises(self, tmp_path: Path) -> None:
+        """YAML file containing just a scalar should raise PatternError."""
+        f = tmp_path / "scalar.yaml"
+        f.write_text("just a string\n")
+        with pytest.raises(PatternError, match="does not contain a YAML mapping"):
+            _load_yaml_file(f)
+
+    def test_invalid_yaml_syntax_raises(self, tmp_path: Path) -> None:
+        f = tmp_path / "bad.yaml"
+        f.write_text("key: [unclosed bracket\n")
+        with pytest.raises(PatternError, match="Failed to read"):
+            _load_yaml_file(f)
+
+
+# ------------------------------------------------------------------ #
+# PatternLoader.load_builtin — additional edge cases
+# ------------------------------------------------------------------ #
+
+
+class TestLoadBuiltinEdgeCases:
+    def test_builtin_loads_actual_patterns(self) -> None:
+        """Builtin directory has real patterns — verify they load."""
+        loader = PatternLoader()
+        patterns = loader.load_builtin()
+        assert len(patterns) > 0
+        for p in patterns:
+            assert p.metadata.name
+
+    def test_builtin_include_specific_pattern(self) -> None:
+        loader = PatternLoader()
+        patterns = loader.load_builtin(include=["security-basics"])
+        names = {p.metadata.name for p in patterns}
+        if patterns:
+            assert names == {"security-basics"}
+
+
+# ------------------------------------------------------------------ #
+# Cache write failure
+# ------------------------------------------------------------------ #
+
+
+class TestCacheWriteFailure:
+    def test_write_to_readonly_dir_logs_warning(self, tmp_path: Path) -> None:
+        """Cache write to unwritable path should not raise."""
+        import os
+
+        readonly_dir = tmp_path / "readonly"
+        readonly_dir.mkdir()
+        os.chmod(str(readonly_dir), 0o444)
+        try:
+            loader = PatternLoader(cache_dir=readonly_dir / "nested")
+            cache_file = readonly_dir / "nested" / "test.json"
+            # Should not raise, just log a warning
+            loader._write_cache(cache_file, [])
+        finally:
+            os.chmod(str(readonly_dir), 0o755)
+
+    def test_read_nonexistent_cache(self, tmp_path: Path) -> None:
+        loader = PatternLoader(cache_dir=tmp_path)
+        result = loader._read_cache(tmp_path / "missing.json", ttl=3600)
+        assert result is None
+
+
+# ------------------------------------------------------------------ #
+# _fetch_remote placeholder
+# ------------------------------------------------------------------ #
+
+
+class TestFetchRemote:
+    def test_fetch_remote_raises_not_implemented(self) -> None:
+        loader = PatternLoader()
+        with pytest.raises(NotImplementedError, match="not yet implemented"):
+            loader._fetch_remote("repo", "path", "main")

@@ -258,6 +258,18 @@ class TestPatternOrdering:
 # --------------------------------------------------------------------------- #
 
 
+class TestNoMatchedFilesReturnsEmpty:
+    def test_patterns_for_different_files_returns_empty(self, builder: ContextBuilder) -> None:
+        """Files exist but none match the patterns dict → returns []."""
+        files = [_make_classified("src/other.py", module="other")]
+        # Patterns only reference a file that's not in the files list
+        patterns: dict[str, list[Pattern]] = {
+            "src/missing.py": [_make_pattern("p1")],
+        }
+        chunks = builder.build_chunks(files, patterns)
+        assert chunks == []
+
+
 class TestUnmatchedFiles:
     def test_files_without_patterns_excluded(self, builder: ContextBuilder) -> None:
         files = [

@@ -60,15 +60,11 @@ class TestBuiltinPatterns:
 
     def test_each_pattern_has_examples(self) -> None:
         for p in self._load_all():
-            assert p.spec.examples.correct or p.spec.examples.incorrect, (
-                f"{p.metadata.name} missing examples"
-            )
+            assert p.spec.examples.correct or p.spec.examples.incorrect, f"{p.metadata.name} missing examples"
 
     def test_each_pattern_has_detection_signals(self) -> None:
         for p in self._load_all():
-            assert p.spec.detection.positive_signals, (
-                f"{p.metadata.name} missing positive detection signals"
-            )
+            assert p.spec.detection.positive_signals, f"{p.metadata.name} missing positive detection signals"
 
     def test_each_pattern_has_remediation(self) -> None:
         for p in self._load_all():
@@ -118,12 +114,13 @@ class TestBuiltinPatterns:
     def test_general_patterns_are_language_agnostic(self) -> None:
         patterns = self._load_all()
         general_names = {
-            "api-error-responses", "security-no-hardcoded-secrets",
-            "error-handling", "naming-conventions",
-            "security-basics", "testing-patterns",
+            "api-error-responses",
+            "security-no-hardcoded-secrets",
+            "error-handling",
+            "naming-conventions",
+            "security-basics",
+            "testing-patterns",
         }
         for p in patterns:
             if p.metadata.name in general_names:
-                assert p.metadata.language is None, (
-                    f"{p.metadata.name} should be language-agnostic"
-                )
+                assert p.metadata.language is None, f"{p.metadata.name} should be language-agnostic"

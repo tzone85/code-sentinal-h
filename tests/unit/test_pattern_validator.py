@@ -132,3 +132,30 @@ class TestValidatePattern:
         )
         warnings = validate_pattern(p)
         assert any("0.5" in w for w in warnings)
+
+
+class TestValidatePatternDataEdgeCases:
+    """Cover line 24-25: the except Exception fallback in validate_pattern_data."""
+
+    def test_non_dict_input(self) -> None:
+        """Passing something that causes an unexpected error."""
+        # A completely mangled input that might trigger an unexpected error
+        data = {"metadata": None, "spec": None}
+        errors = validate_pattern_data(data)
+        assert len(errors) > 0
+
+    def test_string_input(self) -> None:
+        """validate_pattern_data should handle weird types gracefully."""
+        errors = validate_pattern_data({"apiVersion": "v1", "kind": "Pattern", "metadata": "not-a-dict", "spec": 123})
+        assert len(errors) > 0
+
+    def test_nested_invalid_types(self) -> None:
+        errors = validate_pattern_data(
+            {
+                "apiVersion": "v1",
+                "kind": "Pattern",
+                "metadata": {"name": 123, "category": []},
+                "spec": {"description": True},
+            }
+        )
+        assert len(errors) > 0
