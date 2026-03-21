@@ -5,6 +5,7 @@ install:
 
 dev:
 	pip install -e ".[dev]"
+	pre-commit install
 
 test:
 	pytest tests/ -v --cov=codesentinel --cov-report=term-missing
