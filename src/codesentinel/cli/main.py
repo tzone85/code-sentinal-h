@@ -199,7 +199,12 @@ def _build_reporters(*, fmt: str, verbose: bool, config: CodeSentinelConfig) -> 
             ),
         ]
     if fmt == "sarif":
-        return [SarifReporter()]
+        return [
+            SarifReporter(
+                output_path=config.reporters.sarif.output_path,
+                enabled=True,
+            ),
+        ]
     if fmt == "terminal":
         return [TerminalReporter(verbose=verbose)]
     # Unknown format falls back to terminal
