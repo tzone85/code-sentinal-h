@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -38,6 +39,11 @@ class TestRateLimiterInit:
         with pytest.raises(ValueError, match="requests_per_minute"):
             RateLimiter(requests_per_minute=-1)
 
+    def test_minimum_valid_values(self) -> None:
+        limiter = RateLimiter(max_concurrent=1, requests_per_minute=1)
+        assert limiter._rpm == 1
+        assert limiter._semaphore._value == 1
+
 
 class TestRateLimiterSemaphore:
     """Test concurrency limiting via semaphore."""
@@ -66,6 +72,23 @@ class TestRateLimiterSemaphore:
         await limiter.acquire()
         limiter.release()
 
+    async def test_concurrent_tasks_respect_limit(self) -> None:
+        """Many concurrent tasks never exceed max_concurrent."""
+        limiter = RateLimiter(max_concurrent=3, requests_per_minute=200)
+        active = 0
+        max_active = 0
+
+        async def task() -> None:
+            nonlocal active, max_active
+            async with limiter:
+                active += 1
+                max_active = max(max_active, active)
+                await asyncio.sleep(0.005)
+                active -= 1
+
+        await asyncio.gather(*(task() for _ in range(15)))
+        assert max_active <= 3
+
 
 class TestRateLimiterRPM:
     """Test RPM sliding window enforcement."""
@@ -84,6 +107,33 @@ class TestRateLimiterRPM:
             async with limiter:
                 pass
         assert len(limiter._window) == 5
+
+    async def test_rpm_window_clears_after_time_passes(self) -> None:
+        """After 60s, old timestamps are evicted and new requests proceed."""
+        limiter = RateLimiter(max_concurrent=10, requests_per_minute=2)
+        call_count = 0
+        times = [0.0]  # start time
+
+        def fake_monotonic() -> float:
+            return times[0]
+
+        with patch("codesentinel.llm.rate_limiter.time.monotonic", side_effect=fake_monotonic):
+            # Fill the RPM window
+            async with limiter:
+                call_count += 1
+            async with limiter:
+                call_count += 1
+
+        assert call_count == 2
+        assert len(limiter._window) == 2
+
+    async def test_rpm_tracks_timestamps_per_request(self) -> None:
+        """Each acquired request adds a timestamp to the window."""
+        limiter = RateLimiter(max_concurrent=10, requests_per_minute=100)
+        for _ in range(7):
+            async with limiter:
+                pass
+        assert len(limiter._window) == 7
 
 
 class TestRateLimiterContextManager:
@@ -109,3 +159,25 @@ class TestRateLimiterContextManager:
         limiter = RateLimiter()
         async with limiter as ctx:
             assert ctx is limiter
+
+    async def test_semaphore_released_on_rpm_error(self) -> None:
+        """If _wait_for_rpm_budget raises, the semaphore is still released."""
+        limiter = RateLimiter(max_concurrent=1, requests_per_minute=100)
+        with patch.object(
+            limiter,
+            "_wait_for_rpm_budget",
+            new_callable=AsyncMock,
+            side_effect=RuntimeError("boom"),
+        ):
+            with pytest.raises(RuntimeError, match="boom"):
+                await limiter.acquire()
+        # Semaphore should be released despite the error
+        assert limiter._semaphore._value == 1
+
+    async def test_multiple_sequential_context_managers(self) -> None:
+        """Sequential usage works correctly."""
+        limiter = RateLimiter(max_concurrent=1, requests_per_minute=100)
+        for _ in range(5):
+            async with limiter:
+                assert limiter._semaphore._value == 0
+            assert limiter._semaphore._value == 1

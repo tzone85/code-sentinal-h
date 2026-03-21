@@ -50,6 +50,18 @@ class TestPatternsListCommand:
         # Should only include high and above
         assert "medium" not in result.output.lower().split("severity")[0] or True
 
+    def test_list_with_invalid_severity_filter(self) -> None:
+        result = runner.invoke(app, ["patterns", "list", "--severity", "ultra"])
+        assert result.exit_code == 1
+        assert "invalid" in result.output.lower() or "error" in result.output.lower()
+
+    def test_list_with_unknown_language_shows_general_patterns(self) -> None:
+        """Language-agnostic patterns are always included per by_language()."""
+        result = runner.invoke(app, ["patterns", "list", "--language", "cobol"])
+        assert result.exit_code == 0
+        # General patterns (language=None) are included for all languages
+        assert "error-handling" in result.output
+
 
 # ========================================================================== #
 # patterns validate
@@ -72,6 +84,13 @@ class TestPatternsValidateCommand:
         result = runner.invoke(app, ["patterns", "validate", "/nonexistent/file.yaml"])
         assert result.exit_code == 1
         assert "not found" in result.output.lower() or "Error" in result.output
+
+    def test_validate_non_dict_yaml_file(self, tmp_path: Path) -> None:
+        bad_file = tmp_path / "bad_pattern.yaml"
+        bad_file.write_text("- just\n- a\n- list\n")
+        result = runner.invoke(app, ["patterns", "validate", str(bad_file)])
+        assert result.exit_code == 1
+        assert "mapping" in result.output.lower() or "error" in result.output.lower()
 
 
 # ========================================================================== #
@@ -187,6 +206,19 @@ class TestConfigValidateCommand:
         assert result.exit_code == 0
         assert "valid" in result.output.lower()
 
+    def test_validate_displays_provider_and_mode(self) -> None:
+        path = str(CONFIGS_DIR / "full_config.yaml")
+        result = runner.invoke(app, ["config", "validate", "--config", path])
+        assert result.exit_code == 0
+        assert "provider" in result.output.lower() or "LLM" in result.output
+
+    def test_validate_malformed_yaml_config(self, tmp_path: Path) -> None:
+        bad_cfg = tmp_path / "bad.yaml"
+        bad_cfg.write_text("{{invalid yaml:::}")
+        result = runner.invoke(app, ["config", "validate", "--config", str(bad_cfg)])
+        assert result.exit_code == 1
+        assert "failed" in result.output.lower() or "error" in result.output.lower()
+
 
 # ========================================================================== #
 # init (top-level)
@@ -243,3 +275,23 @@ class TestInitCommand:
         assert result.exit_code == 0
         config_file = tmp_path / ".codesentinel.yaml"
         assert config_file.is_file()
+
+
+# ========================================================================== #
+# version command
+# ========================================================================== #
+
+
+class TestVersionCommand:
+    def test_version_prints_version(self) -> None:
+        result = runner.invoke(app, ["version"])
+        assert result.exit_code == 0
+        assert "codesentinel" in result.output.lower()
+
+    def test_version_contains_semver_like_string(self) -> None:
+        result = runner.invoke(app, ["version"])
+        assert result.exit_code == 0
+        # Should contain a version number (digits and dots)
+        import re
+
+        assert re.search(r"\d+\.\d+", result.output)

@@ -281,3 +281,83 @@ class TestOllamaProviderReview:
 
         url = mock_client.post.call_args[0][0]
         assert url == "http://gpu:11434/api/chat"
+
+    async def test_review_passes_timeout_to_client(self) -> None:
+        """Timeout value is forwarded to httpx.AsyncClient."""
+        provider = OllamaProvider(timeout=300.0)
+        fake_data = _make_ollama_response("[]")
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.json.return_value = fake_data
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_resp
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("codesentinel.llm.ollama.httpx.AsyncClient", return_value=mock_client) as mock_cls:
+            await provider.review("sys", "usr")
+
+        mock_cls.assert_called_once_with(timeout=300.0)
+
+    async def test_review_handles_missing_message_key(self) -> None:
+        """Response with no 'message' key returns empty content."""
+        provider = OllamaProvider()
+        fake_data = {"model": "llama3", "done": True}
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.json.return_value = fake_data
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_resp
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("codesentinel.llm.ollama.httpx.AsyncClient", return_value=mock_client):
+            result = await provider.review("sys", "usr")
+
+        assert result.content == ""
+
+    async def test_review_falls_back_to_configured_model(self) -> None:
+        """When response has no 'model' key, uses configured model name."""
+        provider = OllamaProvider(model="codellama")
+        fake_data = {
+            "message": {"role": "assistant", "content": "hello"},
+            "done": True,
+        }
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.json.return_value = fake_data
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_resp
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("codesentinel.llm.ollama.httpx.AsyncClient", return_value=mock_client):
+            result = await provider.review("sys", "usr")
+
+        assert result.model == "codellama"
+
+    async def test_review_handles_trailing_slash_in_url(self) -> None:
+        """URL construction works with trailing-slash-stripped base_url."""
+        provider = OllamaProvider(base_url="http://localhost:11434/")
+        fake_data = _make_ollama_response("[]")
+
+        mock_resp = MagicMock(spec=httpx.Response)
+        mock_resp.json.return_value = fake_data
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock()
+        mock_client.post.return_value = mock_resp
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("codesentinel.llm.ollama.httpx.AsyncClient", return_value=mock_client):
+            await provider.review("sys", "usr")
+
+        url = mock_client.post.call_args[0][0]
+        assert url == "http://localhost:11434/api/chat"
