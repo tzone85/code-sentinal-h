@@ -1,0 +1,71 @@
+diff --git a/src/services/user_service.py b/src/services/user_service.py
+index aaa1111..bbb2222 100644
+--- a/src/services/user_service.py
++++ b/src/services/user_service.py
+@@ -1,8 +1,20 @@
++import sqlite3
++
+ from dataclasses import dataclass
+
+
+ @dataclass
+ class UserService:
+-    def get_user(self, user_id: int):
+-        return {"id": user_id, "name": "Alice"}
++    db_path: str = "users.db"
++
++    def get_user(self, user_id: int) -> dict:
++        conn = sqlite3.connect(self.db_path)
++        cursor = conn.execute(
++            f"SELECT * FROM users WHERE id = {user_id}"
++        )
++        row = cursor.fetchone()
++        conn.close()
++        return {"id": row[0], "name": row[1]}
++
++    def delete_user(self, user_id: int) -> None:
++        conn = sqlite3.connect(self.db_path)
++        conn.execute(f"DELETE FROM users WHERE id = {user_id}")
+diff --git a/src/api/routes.py b/src/api/routes.py
+index ccc3333..ddd4444 100644
+--- a/src/api/routes.py
++++ b/src/api/routes.py
+@@ -1,6 +1,15 @@
+-from flask import Flask
++from flask import Flask, request
+
+ app = Flask(__name__)
+
+-@app.route("/")
+-def index():
+-    return "Hello"
++@app.route("/users/<user_id>")
++def get_user(user_id):
++    from src.services.user_service import UserService
++    svc = UserService()
++    return svc.get_user(int(user_id))
++
++@app.route("/admin/run", methods=["POST"])
++def admin_run():
++    import os
++    cmd = request.form.get("command", "")
++    result = os.popen(cmd).read()
++    return result
+diff --git a/src/models/user.py b/src/models/user.py
+new file mode 100644
+index 0000000..eee5555
+--- /dev/null
++++ b/src/models/user.py
+@@ -0,0 +1,12 @@
++class User:
++    def __init__(self, id, name, email):
++        self.id = id
++        self.name = name
++        self.email = email
++
++    def to_dict(self):
++        return {
++            "id": self.id,
++            "name": self.name,
++            "email": self.email,
++        }
