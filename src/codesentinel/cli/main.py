@@ -8,6 +8,9 @@ import logging
 import typer
 
 import codesentinel
+from codesentinel.cli.config_commands import config_app
+from codesentinel.cli.init_command import init_project
+from codesentinel.cli.pattern_commands import patterns_app
 from codesentinel.core.engine import ReviewEngine
 from codesentinel.core.enums import Severity
 from codesentinel.core.exceptions import CodeSentinelError, ConfigError
@@ -25,6 +28,13 @@ app = typer.Typer(
     help="AI-powered code review tool that enforces architectural patterns.",
     no_args_is_help=True,
 )
+
+# Register sub-apps
+app.add_typer(patterns_app, name="patterns")
+app.add_typer(config_app, name="config")
+
+# Register init as a top-level command
+app.command("init")(init_project)
 
 _SEVERITY_CHOICES = [s.value for s in Severity]
 _FORMAT_CHOICES = ["terminal", "json", "sarif"]
