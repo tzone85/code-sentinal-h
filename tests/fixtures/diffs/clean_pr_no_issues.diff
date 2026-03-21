@@ -1,0 +1,41 @@
+diff --git a/src/services/user_service.py b/src/services/user_service.py
+index aaa1111..bbb2222 100644
+--- a/src/services/user_service.py
++++ b/src/services/user_service.py
+@@ -12,6 +12,15 @@ class UserService:
+     def __init__(self, repository: UserRepository) -> None:
+         self._repository = repository
+
++    def get_user_by_email(self, email: str) -> User | None:
++        """Retrieve a user by their email address.
++
++        Args:
++            email: The email address to search for.
++
++        Returns:
++            The matching User, or None if not found.
++        """
++        return self._repository.find_by_email(email)
++
+     def get_user(self, user_id: int) -> User:
+         return self._repository.find_by_id(user_id)
+diff --git a/tests/test_user_service.py b/tests/test_user_service.py
+index ccc3333..ddd4444 100644
+--- a/tests/test_user_service.py
++++ b/tests/test_user_service.py
+@@ -15,3 +15,15 @@ class TestUserService:
+     def test_get_user_not_found(self, service, mock_repo):
+         mock_repo.find_by_id.return_value = None
+         assert service.get_user(999) is None
++
++    def test_get_user_by_email(self, service, mock_repo):
++        expected = User(id=1, name="Alice", email="alice@example.com")
++        mock_repo.find_by_email.return_value = expected
++
++        result = service.get_user_by_email("alice@example.com")
++        assert result == expected
++        mock_repo.find_by_email.assert_called_once_with("alice@example.com")
++
++    def test_get_user_by_email_not_found(self, service, mock_repo):
++        mock_repo.find_by_email.return_value = None
++        assert service.get_user_by_email("missing@example.com") is None

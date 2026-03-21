@@ -1,5 +1,6 @@
 """Core components: data models, diff parsing, pattern matching, context building."""
 
+from codesentinel.core.diff_parser import LANGUAGE_MAP, DiffParser
 from codesentinel.core.enums import FileStatus, FileType, Severity
 from codesentinel.core.exceptions import (
     CodeSentinelError,
@@ -25,11 +26,13 @@ from codesentinel.core.models import (
 )
 
 __all__ = [
+    "LANGUAGE_MAP",
     "ClassifiedFile",
     "CodeSentinelError",
     "ConfigError",
     "DiffHunk",
     "DiffParseError",
+    "DiffParser",
     "DiffStats",
     "FileDiff",
     "FileStatus",
@@ -37,8 +40,8 @@ __all__ = [
     "Finding",
     "LLMError",
     "LLMResponse",
-    "ParsedDiff",
     "PRInfo",
+    "ParsedDiff",
     "PatternError",
     "ReviewChunk",
     "ReviewResult",

@@ -1,0 +1,48 @@
+diff --git a/myapp/views.py b/myapp/views.py
+index abc1234..def5678 100644
+--- a/myapp/views.py
++++ b/myapp/views.py
+@@ -1,8 +1,35 @@
+ from django.shortcuts import render
+-from django.http import JsonResponse
++from django.http import JsonResponse, HttpResponse
++from django.db import connection
+ from .models import Order
+
+
++def order_list(request):
++    """Fat view that should be in a service/model layer."""
++    with connection.cursor() as cursor:
++        cursor.execute(
++            "SELECT * FROM orders WHERE status = '%s'" % request.GET.get("status", "active")
++        )
++        rows = cursor.fetchall()
++
++    orders = []
++    for row in rows:
++        total = 0
++        for item in row.items:
++            total += item.price * item.quantity
++        orders.append({
++            "id": row.id,
++            "total": total,
++            "status": row.status,
++        })
++    return JsonResponse({"orders": orders})
++
++
+ def order_detail(request, pk):
+     order = Order.objects.get(pk=pk)
+     return JsonResponse({"id": order.pk, "total": order.total})
+diff --git a/myapp/models.py b/myapp/models.py
+index 1111111..2222222 100644
+--- a/myapp/models.py
++++ b/myapp/models.py
+@@ -5,3 +5,7 @@ class Order(models.Model):
+     status = models.CharField(max_length=20)
+     total = models.DecimalField(max_digits=10, decimal_places=2)
+     created_at = models.DateTimeField(auto_now_add=True)
++
++    class Meta:
++        # Missing index on frequently queried status field
++        pass

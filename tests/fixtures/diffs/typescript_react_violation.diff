@@ -1,0 +1,66 @@
+diff --git a/src/components/UserProfile.tsx b/src/components/UserProfile.tsx
+new file mode 100644
+index 0000000..abcdef1
+--- /dev/null
++++ b/src/components/UserProfile.tsx
+@@ -0,0 +1,42 @@
++import React, { useState, useEffect } from 'react';
++
++// Violation: business logic mixed into component,
++// no custom hook extraction, direct fetch in useEffect
++export const UserProfile = ({ userId }: { userId: string }) => {
++  const [user, setUser] = useState<any>(null);
++  const [orders, setOrders] = useState<any[]>([]);
++  const [loading, setLoading] = useState(true);
++
++  useEffect(() => {
++    fetch(`/api/users/${userId}`)
++      .then(res => res.json())
++      .then(data => {
++        setUser(data);
++        // Violation: nested fetch inside useEffect
++        fetch(`/api/users/${userId}/orders`)
++          .then(res => res.json())
++          .then(orderData => {
++            setOrders(orderData);
++            setLoading(false);
++          });
++      });
++  }, [userId]);
++
++  // Violation: complex calculation inline in render
++  const totalSpent = orders.reduce((sum, o) => sum + o.total, 0);
++  const isVip = totalSpent > 1000;
++
++  if (loading) return <div>Loading...</div>;
++
++  return (
++    <div>
++      <h1>{user?.name}</h1>
++      <p>Email: {user?.email}</p>
++      <p>Total Spent: ${totalSpent}</p>
++      {isVip && <span className="badge">VIP Customer</span>}
++      <ul>
++        {orders.map((o, i) => (
++          <li key={i}>{o.name}: ${o.total}</li>
++        ))}
++      </ul>
++    </div>
++  );
++};
+diff --git a/src/utils/api.ts b/src/utils/api.ts
+index 3333333..4444444 100644
+--- a/src/utils/api.ts
++++ b/src/utils/api.ts
+@@ -1,5 +1,9 @@
+-export const API_BASE = '/api';
++export const API_BASE = 'http://localhost:3000/api';
+
+ export async function fetchJson(url: string) {
+-  return fetch(`${API_BASE}${url}`).then(r => r.json());
++  try {
++    return fetch(`${API_BASE}${url}`).then(r => r.json());
++  } catch {
++    return null;
++  }
+ }
