@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: Invalid_Name_Not_Kebab
+  category: general
+spec:
+  description: "This pattern has an invalid name"

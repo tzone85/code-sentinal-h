@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: ddd-aggregates
+  category: architecture
+  language: java
+  severity: medium
+  tags:
+    - ddd
+    - aggregates
+    - domain-driven-design
+  confidence_threshold: 0.75
+spec:
+  description: >
+    DDD Aggregate Boundaries — aggregate roots should be the only entry
+    point for modifying their child entities. External code must not
+    directly modify entities inside an aggregate.
+  rationale: >
+    Aggregates define consistency boundaries in Domain-Driven Design. When
+    external code reaches into an aggregate to modify child entities
+    directly, invariants can be violated and the aggregate root loses
+    control of its transactional consistency.
+  applies_to:
+    include:
+      - "**/*.java"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "service or controller directly modifies a child entity of an aggregate"
+      - "repository returns or saves a non-root entity independently"
+      - "child entity has its own repository separate from the aggregate root"
+    negative_signals:
+      - "modification goes through the aggregate root method"
+      - "repository operates on the aggregate root only"
+      - "value object is immutable and returned by copy"
+    context_clues:
+      - "class is in a domain model package"
+      - "entity has a parent-child relationship"
+      - "aggregate root pattern is used"
+  examples:
+    correct:
+      - description: "Modify child entity through aggregate root"
+        code: |
+          public class Order {
+              private final List<OrderLine> lines = new ArrayList<>();
+
+              public void addLine(Product product, int quantity) {
+                  lines.add(new OrderLine(product, quantity));
+                  recalculateTotal();
+              }
+          }
+
+          // Service goes through the aggregate root
+          order.addLine(product, 2);
+          orderRepository.save(order);
+    incorrect:
+      - description: "Direct modification of child entity"
+        code: |
+          // Bypasses aggregate root, violates invariants
+          OrderLine line = orderLineRepository.findById(lineId);
+          line.setQuantity(5);
+          orderLineRepository.save(line);
+  remediation: >
+    Route all modifications through the aggregate root. Remove repositories
+    for non-root entities. Expose domain methods on the aggregate root that
+    enforce business invariants when modifying child entities.
+  references:
+    - title: "Domain-Driven Design — Eric Evans"
+      url: "https://www.domainlanguage.com/ddd/"
+    - title: "Effective Aggregate Design — Vaughn Vernon"
+      url: "https://www.dddcommunity.org/library/vernon_2011/"

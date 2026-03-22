@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: error-handling
+  category: reliability
+  severity: medium
+  tags:
+    - error-handling
+    - reliability
+    - logging
+  confidence_threshold: 0.7
+spec:
+  description: >
+    Proper Error Handling — catch blocks must not silently swallow exceptions.
+    Every caught exception must be logged, re-raised, or converted into a
+    meaningful error that propagates to the caller.
+  rationale: >
+    Silent error swallowing is one of the most insidious sources of bugs.
+    When exceptions are caught and ignored, the system continues in an
+    invalid state, producing incorrect results or failing much later in an
+    unrelated location. This makes debugging extremely difficult and can
+    mask serious issues in production.
+  applies_to:
+    include:
+      - "**/*.py"
+      - "**/*.java"
+      - "**/*.ts"
+      - "**/*.js"
+      - "**/*.go"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "empty catch/except block with no logging or re-raise"
+      - "catch block that only contains pass, continue, or a comment"
+      - "catch block that catches a broad exception type (Exception, Throwable) without logging"
+      - "error callback that ignores the error parameter"
+    negative_signals:
+      - "catch block logs the error with context"
+      - "catch block re-raises the exception or raises a new one"
+      - "catch block returns a meaningful error result"
+      - "catch block is in test code asserting expected exceptions"
+    context_clues:
+      - "try/catch or try/except block"
+      - "error handling or exception management code"
+      - ".catch() callback in promise chains"
+  examples:
+    correct:
+      - description: "Catch with logging and re-raise"
+        code: |
+          try:
+              result = process_payment(order)
+          except PaymentError as exc:
+              logger.error("Payment failed for order %s: %s", order.id, exc)
+              raise
+      - description: "Catch with meaningful error conversion"
+        code: |
+          try {
+              data = api.fetchUser(userId);
+          } catch (HttpException e) {
+              logger.warn("User fetch failed: {}", e.getMessage());
+              throw new ServiceException("Unable to load user", e);
+          }
+    incorrect:
+      - description: "Empty catch block — silently swallows error"
+        code: |
+          try:
+              result = process_payment(order)
+          except Exception:
+              pass
+      - description: "Catch-all with only a comment"
+        code: |
+          try {
+              data = api.fetchUser(userId);
+          } catch (Exception e) {
+              // TODO: handle this later
+          }
+      - description: "Promise catch that ignores the error"
+        code: |
+          fetchUser(userId)
+            .then(user => setUser(user))
+            .catch(() => {});
+  remediation: >
+    At minimum, log the exception with enough context to debug (what operation
+    failed, with what inputs). Prefer re-raising or converting to a domain-
+    specific exception. If the error is truly expected and recoverable,
+    document why it is safe to suppress and log at debug level.
+  references:
+    - title: "Effective Java — Item 77: Don't ignore exceptions"
+      url: "https://www.oreilly.com/library/view/effective-java/9780134686097/"
+    - title: "Python docs — Errors and Exceptions"
+      url: "https://docs.python.org/3/tutorial/errors.html"

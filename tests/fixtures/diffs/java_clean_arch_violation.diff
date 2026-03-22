@@ -1,0 +1,54 @@
+diff --git a/src/main/java/com/example/domain/UserService.java b/src/main/java/com/example/domain/UserService.java
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/src/main/java/com/example/domain/UserService.java
+@@ -0,0 +1,25 @@
++package com.example.domain;
++
++import com.example.infrastructure.UserRepository;
++import com.example.adapter.http.UserDto;
++import javax.persistence.EntityManager;
++
++/**
++ * Domain service that violates Clean Architecture by
++ * importing from infrastructure and adapter layers.
++ */
++public class UserService {
++    private final UserRepository repository;
++    private final EntityManager em;
++
++    public UserService(UserRepository repository, EntityManager em) {
++        this.repository = repository;
++        this.em = em;
++    }
++
++    public UserDto findUser(Long id) {
++        var user = repository.findById(id);
++        var dto = new UserDto(user.getName(), user.getEmail());
++        return dto;
++    }
++}
+diff --git a/src/main/java/com/example/controller/UserController.java b/src/main/java/com/example/controller/UserController.java
+index 1234567..89abcde 100644
+--- a/src/main/java/com/example/controller/UserController.java
++++ b/src/main/java/com/example/controller/UserController.java
+@@ -1,10 +1,15 @@
+ package com.example.controller;
+
+ import com.example.domain.UserService;
++import com.example.infrastructure.UserRepository;
+ import org.springframework.web.bind.annotation.*;
+
+ @RestController
+ @RequestMapping("/api/users")
+ public class UserController {
+-    private final UserService userService;
++    private final UserService service;
++    private final UserRepository repo;
++
++    public UserController(UserService service, UserRepository repo) {
++        this.service = service;
++        this.repo = repo;
++    }
+ }

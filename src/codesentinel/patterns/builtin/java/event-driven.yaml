@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: event-driven-patterns
+  category: architecture
+  language: java
+  severity: medium
+  tags:
+    - events
+    - event-driven
+    - messaging
+  confidence_threshold: 0.7
+spec:
+  description: >
+    Event-Driven Patterns — events should follow naming conventions (past
+    tense), carry immutable data, and handlers should be idempotent. Avoid
+    synchronous side effects in event publishers.
+  rationale: >
+    Well-structured event-driven systems are resilient and loosely coupled.
+    Poorly named events, mutable event payloads, or non-idempotent handlers
+    create subtle bugs that are hard to debug in distributed systems where
+    events may be delivered out of order or more than once.
+  applies_to:
+    include:
+      - "**/*.java"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+  detection:
+    positive_signals:
+      - "event class name is not in past tense (e.g., CreateOrder instead of OrderCreated)"
+      - "event payload has setter methods (mutable)"
+      - "event handler performs non-idempotent operations without deduplication"
+      - "event publisher blocks on synchronous side effects"
+    negative_signals:
+      - "event named in past tense (OrderCreated, UserRegistered)"
+      - "event class is immutable (final fields, no setters)"
+      - "handler uses idempotency key or deduplication check"
+    context_clues:
+      - "class implements or extends an event type"
+      - "@EventListener or message handler annotation"
+      - "ApplicationEventPublisher usage"
+  examples:
+    correct:
+      - description: "Immutable past-tense event"
+        code: |
+          public record OrderCreated(
+              UUID orderId,
+              UUID customerId,
+              BigDecimal total,
+              Instant occurredAt
+          ) {}
+      - description: "Idempotent event handler"
+        code: |
+          @EventListener
+          @Transactional
+          public void onOrderCreated(OrderCreated event) {
+              if (notificationRepo.existsByOrderId(event.orderId())) {
+                  return; // Already processed — idempotent
+              }
+              notificationService.sendConfirmation(event);
+          }
+    incorrect:
+      - description: "Mutable event with present-tense name"
+        code: |
+          public class CreateOrder {
+              private UUID orderId;
+              public void setOrderId(UUID id) { this.orderId = id; }
+              public UUID getOrderId() { return orderId; }
+          }
+  remediation: >
+    Name events in past tense to describe what happened. Make event classes
+    immutable (records or final fields). Ensure handlers are idempotent by
+    checking for duplicate processing before performing side effects.
+  references:
+    - title: "Designing Event-Driven Systems — Ben Stopford"
+      url: "https://www.confluent.io/designing-event-driven-systems/"

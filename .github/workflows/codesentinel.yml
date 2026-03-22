@@ -1,0 +1,38 @@
+# Dogfood workflow: CodeSentinel reviews its own PRs
+name: CodeSentinel Dogfood
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    name: Self-Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run CodeSentinel on own PRs
+        id: codesentinel
+        uses: ./action
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          config_path: ".codesentinel.yaml"
+          min_severity: "medium"
+          fail_on: "critical"
+
+      - name: Review Summary
+        if: always()
+        env:
+          FINDINGS: ${{ steps.codesentinel.outputs.findings_count }}
+          CRITICAL: ${{ steps.codesentinel.outputs.critical_count }}
+        run: |
+          echo "Findings: $FINDINGS"
+          echo "Critical: $CRITICAL"

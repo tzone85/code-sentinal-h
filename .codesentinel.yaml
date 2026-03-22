@@ -1,0 +1,40 @@
+# CodeSentinel dogfood configuration — reviews its own PRs
+version: "1.0"
+
+llm:
+  provider: claude
+  model: claude-sonnet-4-20250514
+  temperature: 0.2
+
+patterns:
+  builtin:
+    enabled: true
+    include:
+      - error-handling
+      - security-basics
+      - security-no-hardcoded-secrets
+      - naming-conventions
+      - testing-patterns
+      - pep8-beyond-linting
+
+review:
+  min_severity: medium
+  max_findings: 15
+  min_confidence: 0.7
+  mode: coaching
+  ignore:
+    - "*.lock"
+    - "*.min.js"
+    - "*.snap"
+    - "package-lock.json"
+    - "poetry.lock"
+
+reporters:
+  terminal:
+    enabled: true
+    verbose: false
+  github:
+    enabled: true
+    post_review: true
+    request_changes_on: critical
+    comment_style: both

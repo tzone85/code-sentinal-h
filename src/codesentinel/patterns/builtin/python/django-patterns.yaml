@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: django-patterns
+  category: web
+  language: python
+  severity: medium
+  tags:
+    - django
+    - fat-models
+    - thin-views
+  confidence_threshold: 0.7
+spec:
+  description: >
+    Django Best Practices — favour fat models and thin views. Business logic
+    belongs in model methods or service objects, not in views or serializers.
+    Keep views focused on HTTP request/response handling.
+  rationale: >
+    Business logic scattered across views is difficult to test and reuse.
+    Fat models encapsulate domain behaviour close to the data, making it
+    testable without the HTTP layer and reusable across management commands,
+    Celery tasks, and API endpoints.
+  applies_to:
+    include:
+      - "**/*.py"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+      - "**/migrations/**"
+  detection:
+    positive_signals:
+      - "view function contains complex queryset filtering or business logic"
+      - "view performs multiple database writes without a service or model method"
+      - "serializer contains business logic beyond validation"
+    negative_signals:
+      - "view delegates to a model method or service"
+      - "business logic is in a model method or manager"
+      - "view only handles HTTP concerns (auth, serialization, response)"
+    context_clues:
+      - "class inherits from APIView, ViewSet, or generic view"
+      - "file is in a views/ or api/ directory"
+      - "Django ORM queryset operations"
+  examples:
+    correct:
+      - description: "Thin view delegating to model method"
+        code: |
+          class OrderView(APIView):
+              def post(self, request):
+                  order = Order.create_from_cart(
+                      user=request.user,
+                      cart_items=request.data["items"],
+                  )
+                  return Response(OrderSerializer(order).data, status=201)
+    incorrect:
+      - description: "Fat view with business logic"
+        code: |
+          class OrderView(APIView):
+              def post(self, request):
+                  items = request.data["items"]
+                  total = sum(item["price"] * item["qty"] for item in items)
+                  if total > request.user.credit_limit:
+                      return Response({"error": "Over limit"}, status=400)
+                  order = Order.objects.create(user=request.user, total=total)
+                  for item in items:
+                      OrderLine.objects.create(order=order, **item)
+                  send_confirmation_email(request.user, order)
+                  return Response(OrderSerializer(order).data, status=201)
+  remediation: >
+    Extract business logic into model methods (Order.create_from_cart),
+    manager methods, or dedicated service modules. Views should only
+    handle request parsing, permission checks, and response formatting.
+  references:
+    - title: "Two Scoops of Django — Fat Models"
+      url: "https://www.feldroy.com/books/two-scoops-of-django-3-x"

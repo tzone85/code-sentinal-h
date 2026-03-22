@@ -1,0 +1,79 @@
+apiVersion: v1
+kind: Pattern
+metadata:
+  name: react-patterns
+  category: frontend
+  language: typescript
+  severity: medium
+  tags:
+    - react
+    - hooks
+    - components
+  confidence_threshold: 0.7
+spec:
+  description: >
+    React Patterns — follow Rules of Hooks (only call at top level, only
+    in React functions), keep components focused (single responsibility),
+    and avoid direct DOM manipulation.
+  rationale: >
+    Violating the Rules of Hooks causes subtle bugs because React relies on
+    call order to track state. Oversized components with mixed concerns are
+    difficult to test, reuse, and maintain. Direct DOM manipulation bypasses
+    React's reconciliation, leading to stale UI and unpredictable behaviour.
+  applies_to:
+    include:
+      - "**/*.tsx"
+      - "**/*.ts"
+      - "**/*.jsx"
+    exclude:
+      - "**/test/**"
+      - "**/tests/**"
+      - "**/*.test.*"
+      - "**/*.spec.*"
+  detection:
+    positive_signals:
+      - "hook called inside a conditional (if/else) or loop"
+      - "hook called inside a non-component, non-hook function"
+      - "direct DOM manipulation (document.getElementById, querySelector) in a component"
+      - "component file exceeds 300 lines with multiple concerns"
+    negative_signals:
+      - "hooks called at top level of component or custom hook"
+      - "useRef used for DOM references instead of direct manipulation"
+      - "component is focused on a single responsibility"
+    context_clues:
+      - "function component returning JSX"
+      - "useState, useEffect, or custom hook usage"
+      - "file in a components/ directory"
+  examples:
+    correct:
+      - description: "Hooks at top level, focused component"
+        code: |
+          function UserProfile({ userId }: { userId: string }) {
+            const [user, setUser] = useState<User | null>(null);
+            const [loading, setLoading] = useState(true);
+
+            useEffect(() => {
+              fetchUser(userId).then(setUser).finally(() => setLoading(false));
+            }, [userId]);
+
+            if (loading) return <Spinner />;
+            if (!user) return <NotFound />;
+            return <ProfileCard user={user} />;
+          }
+    incorrect:
+      - description: "Hook inside conditional"
+        code: |
+          function UserProfile({ userId }: { userId: string }) {
+            if (userId) {
+              const [user, setUser] = useState<User | null>(null);
+              // Violation: hook inside conditional
+            }
+            return <div />;
+          }
+  remediation: >
+    Always call hooks at the top level of the component function. Extract
+    complex logic into custom hooks. Split large components into smaller,
+    focused components. Use refs instead of direct DOM manipulation.
+  references:
+    - title: "React Docs — Rules of Hooks"
+      url: "https://react.dev/reference/rules/rules-of-hooks"
