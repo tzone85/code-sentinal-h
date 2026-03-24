@@ -202,7 +202,6 @@ class ReviewEngine:
         patterns_context = "\n\n".join(
             f"### {p.metadata.name}\n{p.spec.description}"
             for p in chunk.patterns
-            if hasattr(p, "metadata")
         )
         system_prompt = build_system_prompt(
             confidence_threshold=float(self._config.get("min_confidence", 0.7)),
