@@ -9,7 +9,7 @@ from __future__ import annotations
 import fnmatch
 from pathlib import PurePosixPath
 
-from codesentinel.core.diff_parser import LANGUAGE_MAP
+from codesentinel.core.diff_parser import _detect_language
 from codesentinel.core.enums import FileType
 from codesentinel.core.models import ClassifiedFile, FileDiff
 
@@ -135,12 +135,6 @@ _FRAMEWORK_PATH_HINTS: dict[str, list[str]] = {
 def _matches_any(path: str, patterns: list[str]) -> bool:
     """Check if a path matches any of the given glob patterns."""
     return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
-
-
-def _detect_language(path: str) -> str | None:
-    """Detect programming language from file extension."""
-    suffix = PurePosixPath(path).suffix.lower()
-    return LANGUAGE_MAP.get(suffix)
 
 
 def _detect_file_type(path: str) -> FileType:

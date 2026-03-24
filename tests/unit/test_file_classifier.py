@@ -86,8 +86,14 @@ class TestDetectLanguage:
     def test_unknown_extension(self) -> None:
         assert _detect_language("data.xyz123") is None
 
-    def test_no_extension(self) -> None:
-        assert _detect_language("Makefile") is None
+    def test_makefile_detected(self) -> None:
+        assert _detect_language("Makefile") == "makefile"
+
+    def test_dockerfile_detected(self) -> None:
+        assert _detect_language("Dockerfile") == "dockerfile"
+
+    def test_truly_extensionless_file(self) -> None:
+        assert _detect_language("LICENCE") is None
 
     def test_case_insensitive_suffix(self) -> None:
         assert _detect_language("file.PY") == "python"
