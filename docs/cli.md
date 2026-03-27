@@ -49,6 +49,8 @@ codesentinel review [OPTIONS]
 
 ### Examples
 
+**macOS / Linux:**
+
 ```bash
 # Review a patch file, show only high+ severity
 codesentinel review --diff changes.patch --severity high
@@ -62,6 +64,20 @@ codesentinel review --pr https://github.com/org/repo/pull/42 --format json
 
 # Dry run — show config without reviewing
 codesentinel review --diff changes.patch --dry-run
+```
+
+**Windows (PowerShell):**
+
+```powershell
+# Review staged changes
+codesentinel review --staged --verbose
+
+# Review a GitHub PR
+$env:GITHUB_TOKEN = "ghp_..."
+codesentinel review --pr https://github.com/org/repo/pull/42 --format json
+
+# If codesentinel isn't on PATH, use:
+python -m codesentinel review --staged
 ```
 
 ## `patterns` — Manage Patterns

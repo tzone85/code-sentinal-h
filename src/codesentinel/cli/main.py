@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from pathlib import Path
 
 import typer
 
@@ -79,20 +80,23 @@ def review(
         typer.echo("Error: Provide --diff, --branch, --pr, or --staged.", err=True)
         raise typer.Exit(code=2)
 
-    # Build config (load from file + CLI overrides)
-    config = _build_config(severity=severity, config_path=config_path)
+    # Load full config object (once) for everything
+    cs_config = _load_cs_config(config_path)
+
+    # Build engine config dict with CLI overrides
+    config = _build_config(severity=severity, cs_config=cs_config)
 
     if dry_run:
         typer.echo(f"Target: {target}")
         typer.echo(f"Config: {config}")
         raise typer.Exit(code=0)
 
-    # Load full config object for provider/reporter initialization
-    cs_config = _load_cs_config(config_path)
-
-    # Load patterns
+    # Load patterns from all configured sources (builtin → remote → local)
     loader = PatternLoader()
-    patterns = loader.load_builtin()
+    patterns_config = cs_config.patterns.model_dump()
+    patterns = loader.load_all(patterns_config)
+    if not patterns:
+        logger.warning("No patterns loaded — review may produce no findings")
     registry = PatternRegistry(patterns)
 
     # Create LLM provider based on config
@@ -177,15 +181,24 @@ def _load_cs_config(config_path: str) -> CodeSentinelConfig:
         return CodeSentinelConfig()
 
 
-def _build_config(*, severity: str, config_path: str) -> dict[str, object]:
-    """Build a configuration dict from config file with CLI overrides."""
-    cs_config = _load_cs_config(config_path)
+def _build_config(*, severity: str, cs_config: CodeSentinelConfig) -> dict[str, object]:
+    """Build a configuration dict from config object with CLI overrides."""
+    # Read additional context file contents
+    additional_context = ""
+    for ctx in cs_config.review.additional_context:
+        try:
+            additional_context += Path(ctx.path).read_text(encoding="utf-8") + "\n"
+        except OSError:
+            logger.warning("Cannot read additional context file: %s", ctx.path)
+
     return {
         "mode": cs_config.review.mode,
         "min_severity": severity,
         "min_confidence": cs_config.review.min_confidence,
         "max_findings": cs_config.review.max_findings,
-        "fail_on": "critical",
+        "fail_on": cs_config.review.min_severity,
+        "additional_context": additional_context,
+        "max_concurrent_requests": cs_config.llm.max_concurrent_requests,
     }
 
 

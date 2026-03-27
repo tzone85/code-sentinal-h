@@ -113,27 +113,34 @@ class TestBuildReporters:
 
 class TestBuildConfig:
     def test_returns_dict_with_severity(self) -> None:
-        config = _build_config(severity="high", config_path="/nonexistent.yaml")
+        cs_config = CodeSentinelConfig()
+        config = _build_config(severity="high", cs_config=cs_config)
         assert config["min_severity"] == "high"
 
     def test_returns_dict_with_defaults(self) -> None:
-        config = _build_config(severity="medium", config_path="/nonexistent.yaml")
+        cs_config = CodeSentinelConfig()
+        config = _build_config(severity="medium", cs_config=cs_config)
         assert "mode" in config
         assert "fail_on" in config
 
-    def test_loads_config_file_when_present(self, tmp_path: Path) -> None:
-        cfg_file = tmp_path / ".codesentinel.yaml"
-        cfg_file.write_text("llm:\n  provider: openai\n", encoding="utf-8")
-        config = _build_config(severity="medium", config_path=str(cfg_file))
-        # Config loader should merge the file
-        assert isinstance(config, dict)
+    def test_fail_on_uses_config_severity(self) -> None:
+        cs_config = CodeSentinelConfig()
+        config = _build_config(severity="medium", cs_config=cs_config)
+        assert config["fail_on"] == cs_config.review.min_severity
 
-    def test_severity_override_applies(self, tmp_path: Path) -> None:
-        cfg_file = tmp_path / ".codesentinel.yaml"
-        cfg_file.write_text("review:\n  min_severity: low\n", encoding="utf-8")
-        # CLI severity flag should override config file
-        config = _build_config(severity="critical", config_path=str(cfg_file))
+    def test_severity_override_applies(self) -> None:
+        cs_config = CodeSentinelConfig()
+        config = _build_config(severity="critical", cs_config=cs_config)
         assert config["min_severity"] == "critical"
+
+    def test_additional_context_included(self, tmp_path: Path) -> None:
+        ctx_file = tmp_path / "context.txt"
+        ctx_file.write_text("extra context", encoding="utf-8")
+        from codesentinel.config.schema import AdditionalContext, ReviewConfig
+        review = ReviewConfig(additional_context=(AdditionalContext(path=str(ctx_file)),))
+        cs_config = CodeSentinelConfig(review=review)
+        config = _build_config(severity="medium", cs_config=cs_config)
+        assert "extra context" in config["additional_context"]
 
 
 # --------------------------------------------------------------------------- #

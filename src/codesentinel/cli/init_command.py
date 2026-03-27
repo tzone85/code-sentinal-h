@@ -78,6 +78,7 @@ def init_project(
 
     if non_interactive:
         provider = "claude"
+        api_key_var = _DEFAULT_API_KEY_VARS["claude"]
         pattern_sources: list[str] = []
     else:
         # Interactive prompts
@@ -89,7 +90,7 @@ def init_project(
             typer.echo(f"Warning: Unknown provider '{provider}', using anyway.")
 
         default_key_var = _DEFAULT_API_KEY_VARS.get(provider, "")
-        typer.prompt(
+        api_key_var = typer.prompt(
             "API key environment variable",
             default=default_key_var,
         )
@@ -105,6 +106,7 @@ def init_project(
         "version": "1.0",
         "llm": {
             "provider": provider,
+            "api_key_env": api_key_var,
         },
         "patterns": {
             "builtin": {"enabled": True},

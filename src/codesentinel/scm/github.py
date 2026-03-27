@@ -78,7 +78,7 @@ class GitHubSCM(SCMProvider):
         url = f"{self._base_url}/repos/{owner}/{repo}/pulls/{number}"
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self._auth_headers())
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -108,7 +108,7 @@ class GitHubSCM(SCMProvider):
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=headers)
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -138,7 +138,7 @@ class GitHubSCM(SCMProvider):
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, headers=self._auth_headers(), json=payload)
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -172,7 +172,7 @@ class GitHubSCM(SCMProvider):
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, headers=self._auth_headers(), json=payload)
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:

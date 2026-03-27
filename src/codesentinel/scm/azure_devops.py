@@ -105,7 +105,7 @@ class AzureDevOpsSCM(SCMProvider):
         params = {"api-version": "7.1"}
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self._auth_headers(), params=params)
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -146,7 +146,7 @@ class AzureDevOpsSCM(SCMProvider):
         params = {"api-version": "7.1"}
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 # Get iterations to find the latest
                 iter_url = f"{base_url}/pullrequests/{number}/iterations"
                 response = await client.get(
@@ -224,7 +224,7 @@ class AzureDevOpsSCM(SCMProvider):
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     url, headers=self._auth_headers(), json=payload, params=params
                 )
@@ -266,7 +266,7 @@ class AzureDevOpsSCM(SCMProvider):
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     threads_url, headers=self._auth_headers(), json=payload, params=params
                 )

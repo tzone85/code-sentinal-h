@@ -95,7 +95,7 @@ class BitbucketSCM(SCMProvider):
         )
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self._auth_headers())
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -128,7 +128,7 @@ class BitbucketSCM(SCMProvider):
         )
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self._auth_headers())
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -164,7 +164,7 @@ class BitbucketSCM(SCMProvider):
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     url, headers=self._auth_headers(), json=payload
                 )
@@ -199,7 +199,7 @@ class BitbucketSCM(SCMProvider):
         payload = {"content": {"raw": body}}
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     comment_url, headers=self._auth_headers(), json=payload
                 )

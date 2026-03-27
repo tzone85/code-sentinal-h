@@ -16,6 +16,7 @@ from codesentinel.core.context_builder import ContextBuilder
 from codesentinel.core.diff_parser import DiffParser
 from codesentinel.core.enums import Severity
 from codesentinel.core.file_classifier import FileClassifier
+from codesentinel.llm.rate_limiter import RateLimiter
 from codesentinel.core.models import (
     Finding,
     LLMResponse,
@@ -58,6 +59,9 @@ class ReviewEngine:
         self._diff_parser = DiffParser()
         self._file_classifier = FileClassifier()
         self._pattern_matcher = PatternMatcher()
+        self._rate_limiter = RateLimiter(
+            max_concurrent=int(config.get("max_concurrent_requests", 3)),
+        )
         self._post_processor = PostProcessor(
             min_severity=_SEVERITY_MAP.get(
                 str(config.get("min_severity", "medium")), Severity.MEDIUM
@@ -80,7 +84,7 @@ class ReviewEngine:
         start_ms = _now_ms()
 
         # 1. Extract raw diff text
-        raw_diff = self._extract_diff(target)
+        raw_diff = await self._extract_diff(target)
         if raw_diff is None:
             return self._empty_result(target, start_ms)
 
@@ -161,11 +165,29 @@ class ReviewEngine:
     # Diff extraction
     # ------------------------------------------------------------------ #
 
-    def _extract_diff(self, target: ReviewTarget) -> str | None:
+    async def _extract_diff(self, target: ReviewTarget) -> str | None:
         """Extract raw diff text from the target source."""
         if target.type == "diff" and target.diff_path:
             return self._read_diff_file(target.diff_path)
-        # TODO: branch diff via LocalGitSCM, PR diff via SCM provider
+
+        if target.type == "pr" and target.pr_url and self._scm_provider:
+            try:
+                return await self._scm_provider.get_pr_diff(target.pr_url)
+            except Exception:
+                logger.error("Failed to fetch PR diff for %s", target.pr_url, exc_info=True)
+                return None
+
+        if target.type in ("branch", "staged") and self._scm_provider:
+            repo_path = target.repo_path or "."
+            base = target.base_branch or "main"
+            head = "--staged" if target.type == "staged" else (target.branch or "HEAD")
+            try:
+                return await self._scm_provider.get_local_diff(repo_path, base, head)
+            except Exception:
+                logger.error("Failed to get local diff", exc_info=True)
+                return None
+
+        logger.warning("No diff source available for target type: %s", target.type)
         return None
 
     @staticmethod
@@ -212,9 +234,10 @@ class ReviewEngine:
 
         for attempt in range(2):
             try:
-                return await self._llm_provider.review(
-                    system_prompt, user_prompt, "json"
-                )
+                async with self._rate_limiter:
+                    return await self._llm_provider.review(
+                        system_prompt, user_prompt, "json"
+                    )
             except Exception:
                 if attempt == 0:
                     logger.warning(
