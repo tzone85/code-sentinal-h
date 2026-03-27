@@ -6,9 +6,14 @@ All models are frozen dataclasses to enforce immutability.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from codesentinel.core.enums import FileStatus, FileType, Severity
+
+if TYPE_CHECKING:
+    from codesentinel.patterns.schema import Pattern
+
 
 # --------------------------------------------------------------------------- #
 # Diff models
@@ -143,7 +148,7 @@ class ReviewResult:
     stats: ReviewStats
     target: ReviewTarget
     config: dict[str, object] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 # --------------------------------------------------------------------------- #
@@ -167,7 +172,7 @@ class ReviewChunk:
     """A chunk of review context to send to the LLM."""
 
     files: tuple[FileDiff, ...]
-    patterns: tuple[object, ...] = ()
+    patterns: tuple[Pattern, ...] = ()
     additional_context: str = ""
     estimated_tokens: int = 0
 

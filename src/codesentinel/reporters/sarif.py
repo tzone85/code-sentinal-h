@@ -76,7 +76,7 @@ class SarifReporter(Reporter):
 
         output = Path(self._output_path)
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(json.dumps(sarif, indent=2))
+        output.write_text(json.dumps(sarif, indent=2), encoding="utf-8")
         logger.info("SARIF report written to %s", self._output_path)
 
 

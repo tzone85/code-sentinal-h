@@ -2,22 +2,9 @@
 
 from __future__ import annotations
 
-from fnmatch import fnmatch
-from pathlib import PurePosixPath
-
 from codesentinel.core.enums import Severity
+from codesentinel.core.pattern_matcher import _path_matches_glob
 from codesentinel.patterns.schema import Pattern
-
-
-def _glob_match(file_path: str, pattern: str) -> bool:
-    """Match a file path against a glob pattern, supporting ``**``."""
-    # Fast path: literal **/* means "any file at any depth"
-    if pattern == "**/*":
-        return True
-    # Use PurePosixPath.match for patterns with **
-    if "**" in pattern:
-        return PurePosixPath(file_path).match(pattern)
-    return fnmatch(file_path, pattern)
 
 
 class PatternRegistry:
@@ -78,12 +65,12 @@ class PatternRegistry:
             applies = pattern.spec.applies_to
 
             # Check include globs
-            included = any(_glob_match(file_path, glob) for glob in applies.include)
+            included = any(_path_matches_glob(file_path, glob) for glob in applies.include)
             if not included:
                 continue
 
             # Check exclude globs
-            excluded = any(_glob_match(file_path, glob) for glob in applies.exclude)
+            excluded = any(_path_matches_glob(file_path, glob) for glob in applies.exclude)
             if excluded:
                 continue
 

@@ -140,7 +140,10 @@ def build_user_prompt(chunk: ReviewChunk) -> str:
     if chunk.patterns:
         sections.append("## Applicable Patterns\n")
         for pattern in chunk.patterns:
-            sections.append(f"- {pattern}")
+            if hasattr(pattern, "metadata") and hasattr(pattern, "spec"):
+                sections.append(f"- **{pattern.metadata.name}**: {pattern.spec.description}")
+            else:
+                sections.append(f"- {pattern}")
         sections.append("")
 
     if chunk.additional_context:

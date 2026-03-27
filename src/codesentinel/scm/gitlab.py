@@ -83,7 +83,7 @@ class GitLabSCM(SCMProvider):
         url = f"{self._base_url}/api/v4/projects/{encoded}/merge_requests/{mr_number}"
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self._auth_headers())
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -114,7 +114,7 @@ class GitLabSCM(SCMProvider):
         )
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, headers=self._auth_headers())
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -168,7 +168,7 @@ class GitLabSCM(SCMProvider):
         }
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(url, headers=self._auth_headers(), json=payload)
                 response.raise_for_status()
         except httpx.HTTPStatusError as exc:
@@ -201,7 +201,7 @@ class GitLabSCM(SCMProvider):
         )
 
         try:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
                     notes_url, headers=self._auth_headers(), json={"body": body}
                 )

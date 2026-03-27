@@ -39,10 +39,26 @@ pip install -e ".[dev]"
 ### Prerequisites
 
 - Python 3.11 or later
+- Works on **macOS, Linux, and Windows**
 - An API key for your chosen LLM provider:
-  - **Claude:** `export ANTHROPIC_API_KEY=your-key`
-  - **OpenAI:** `export OPENAI_API_KEY=your-key`
-  - **Ollama:** No key needed (local inference)
+
+**macOS / Linux:**
+
+```bash
+export ANTHROPIC_API_KEY=your-key   # Claude
+export OPENAI_API_KEY=your-key      # OpenAI
+# Ollama — no key needed
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:ANTHROPIC_API_KEY = "your-key"   # Claude
+$env:OPENAI_API_KEY = "your-key"      # OpenAI
+# Ollama — no key needed
+```
+
+> **Windows users:** See [Windows Setup](docs/getting-started.md#windows-specific-setup) for PATH, encoding, and proxy troubleshooting.
 
 ## Quick Start
 
